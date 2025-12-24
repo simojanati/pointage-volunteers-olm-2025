@@ -1,17 +1,26 @@
 <!doctype html>
 <html lang="fr">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pointage - Tableau de bord</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="icon" href="./assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="manifest" href="./assets/site.webmanifest">
+  <meta name="theme-color" content="#c8102e">
 </head>
+
 <body class="text-white">
   <nav class="navbar navbar-expand-lg navbar-dark bg-transparent">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center gap-2" href="./admin.html">
-        <span class="logo-slot" aria-hidden="true"><img src="assets/MAR25.webp" class="img-fluid rounded-3" alt="AFCON Morocco 2025"></span>
+        <span class="logo-slot" aria-hidden="true"><img src="assets/MAR25.webp" class="img-fluid rounded-3"
+            alt="AFCON Morocco 2025"></span>
         <span class="fw-bold">Pointage</span>
       </a>
 
@@ -36,9 +45,10 @@
           </div>
         </div>
 
-                <div class="row g-2 mt-2">
+        <div class="row g-2 mt-2">
           <div class="col-12 col-md-8">
-            <input id="search" class="form-control bg-dark text-white border-0" placeholder="🔎 Rechercher (nom ou code badge)..." />
+            <input id="search" class="form-control bg-dark text-white border-0"
+              placeholder="🔎 Rechercher (nom ou code badge)..." />
           </div>
           <div class="col-6 col-md-2 d-grid">
             <button id="clearSearchBtn" class="btn btn-outline-light">Effacer</button>
@@ -48,10 +58,11 @@
           </div>
         </div>
 
-        <div id="list"
-     class="vstack gap-2 mt-3"></div>
+        <div id="list" class="vstack gap-2 mt-3"></div>
 
-        <div id="toast" class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white" style="opacity:0; transition: opacity .2s;"></div>
+        <div id="toast"
+          class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white"
+          style="opacity:0; transition: opacity .2s;"></div>
       </div>
     </div>
   </main>
@@ -69,7 +80,8 @@
           <form id="addForm" class="vstack gap-2">
             <div>
               <label class="form-label small text-muted2 mb-1">Nom complet</label>
-              <input id="fullName" class="form-control bg-black text-white border-0" required placeholder="Ex: JANATI IDRISSI Moham..." />
+              <input id="fullName" class="form-control bg-black text-white border-0" required
+                placeholder="Ex: JANATI IDRISSI Moham..." />
             </div>
             <div>
               <label class="form-label small text-muted2 mb-1">Code badge</label>
@@ -97,4 +109,5 @@
   <script src="./assets/api.js"></script>
   <script src="./assets/app.js"></script>
 </body>
+
 </html>

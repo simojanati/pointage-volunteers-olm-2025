@@ -1,0 +1,20 @@
+{
+  "name": "Pointage",
+  "short_name": "Pointage",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0f1b",
+  "theme_color": "#c8102e",
+  "icons": [
+    {
+      "src": "favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
