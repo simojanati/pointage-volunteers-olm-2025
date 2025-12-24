@@ -1,0 +1,66 @@
+/* Theme: Morocco vibes (red/green/white) */
+:root{
+  --mor-red:#c8102e;
+  --mor-green:#00a35a; /* brighter for contrast */
+
+  --bs-primary: var(--mor-red);
+  --bs-primary-rgb: 200,16,46;
+  --bs-success: var(--mor-green);
+  --bs-success-rgb: 0,163,90;
+}
+
+body{
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(200,16,46,.22), transparent 60%),
+    radial-gradient(900px 550px at 95% 0%, rgba(0,163,90,.18), transparent 55%),
+    linear-gradient(180deg, #0b0f1b, #070a14);
+  min-height: 100vh;
+}
+
+.bg-glass{
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  backdrop-filter: blur(10px);
+}
+
+.text-muted2{ color: rgba(255,255,255,.72) !important; }
+
+.logo-slot{
+  width:72px;height:44px;border-radius:14px;
+  display:inline-block;
+  background: rgba(255,255,255,.06);
+  border: 1px dashed rgba(255,255,255,.20);
+}
+
+.list-card{
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+}
+
+.badge-soft{
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.table-wrap{
+  overflow-x:auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Better contrast for titles/links */
+h1,h2,h3,h4,h5,h6,.navbar-brand,.nav-link{ color:#fff !important; }
+
+/* Pro feel on mobile */
+.btn{ border-radius: 12px; font-weight: 700; }
+.form-control{ border-radius: 12px; }
+.card{ border-radius: 18px; }
+.navbar{ border-bottom: 1px solid rgba(255,255,255,.10); }
+
+code{
+  background: rgba(255,255,255,.10);
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.14);
+  color: #fff;
+}

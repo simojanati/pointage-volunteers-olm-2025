@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pointage - Tableau de bord</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body class="text-white">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-transparent">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="./admin.html">
+        <span class="logo-slot" aria-hidden="true"><img src="assets/MAR25.webp" class="img-fluid rounded-3" alt="AFCON Morocco 2025"></span>
+        <span class="fw-bold">Pointage</span>
+      </a>
+
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-light btn-sm" href="./reports.html">Rapports</a>
+        <button id="logoutBtn" class="btn btn-outline-light btn-sm">Déconnexion</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-3">
+    <div class="card bg-glass shadow-lg">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h2 class="h5 mb-1">Volontaires</h2>
+            <div id="today" class="text-muted2 small"></div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-soft text-white" id="countPill">0</span>
+            <button id="refreshBtn" class="btn btn-outline-light btn-sm">Actualiser</button>
+          </div>
+        </div>
+
+                <div class="row g-2 mt-2">
+          <div class="col-12 col-md-8">
+            <input id="search" class="form-control bg-dark text-white border-0" placeholder="🔎 Rechercher (nom ou code badge)..." />
+          </div>
+          <div class="col-6 col-md-2 d-grid">
+            <button id="clearSearchBtn" class="btn btn-outline-light">Effacer</button>
+          </div>
+          <div class="col-6 col-md-2 d-grid">
+            <button id="openAddBtn" class="btn btn-primary">+ Ajouter</button>
+          </div>
+        </div>
+
+        <div id="list"
+     class="vstack gap-2 mt-3"></div>
+
+        <div id="toast" class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white" style="opacity:0; transition: opacity .2s;"></div>
+      </div>
+    </div>
+  </main>
+
+
+  <!-- Add Volunteer Modal -->
+  <div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-light-subtle" style="border-radius:18px;">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Ajouter un volontaire</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body pt-0">
+          <form id="addForm" class="vstack gap-2">
+            <div>
+              <label class="form-label small text-muted2 mb-1">Nom complet</label>
+              <input id="fullName" class="form-control bg-black text-white border-0" required placeholder="Ex: JANATI IDRISSI Moham..." />
+            </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Code badge</label>
+              <input id="badgeCode" class="form-control bg-black text-white border-0" placeholder="Ex: 00034500-1" />
+              <div class="form-text text-muted2">Optionnel</div>
+            </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Téléphone</label>
+              <input id="phone" class="form-control bg-black text-white border-0" placeholder="Ex: 06..." />
+              <div class="form-text text-muted2">Optionnel</div>
+            </div>
+
+            <button class="btn btn-primary mt-2" type="submit">Enregistrer</button>
+            <div id="addMsg" class="small"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./assets/config.js"></script>
+  <script src="./assets/auth.js"></script>
+  <script src="./assets/api.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
