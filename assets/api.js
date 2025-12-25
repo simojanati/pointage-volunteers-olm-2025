@@ -80,3 +80,13 @@ async function apiDashboardStats(from, to, group){
 async function apiVolunteerHistory(volunteerId, from, to){
   return jsonpRequest({ action:"volunteerHistory", volunteerId: String(volunteerId), from, to });
 }
+
+
+// Public (no login) - used by viewer.html
+async function apiPublicListVolunteers(search=""){
+  return jsonpRequest({ action:"publicListVolunteers", search });
+}
+
+async function apiPublicVolunteerHistory(volunteerId, from="", to=""){
+  return jsonpRequest({ action:"publicVolunteerHistory", volunteerId: String(volunteerId||""), from, to });
+}

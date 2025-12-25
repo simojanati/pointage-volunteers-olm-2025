@@ -104,6 +104,14 @@ function doGet(e){
     if(action === "login") return jsonp(login(p), callback);
     if(action === "me") return jsonp(me(p), callback);
 
+    // PUBLIC actions (Viewer, no sessionToken)
+    if(action === "publicListVolunteers"){
+      return jsonp(listVolunteers(p.search || ""), callback);
+    }
+    if(action === "publicVolunteerHistory"){
+      return jsonp(volunteerHistory(p), callback);
+    }
+
     // ADMIN actions
     if(action === "listVolunteers"){
       const auth = requireRole(p, "ADMIN");
