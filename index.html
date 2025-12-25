@@ -26,20 +26,25 @@
             <div class="mb-3 text-center">
               <img src="assets/MAR25.webp" class="img-fluid rounded-3" alt="AFCON Morocco 2025">
               <div class="mt-3">
-                <h1 class="h4 mb-0">Pointage</h1>
+                <h1 class="h4 mb-0 text-white">Pointage</h1>
                 <div class="text-muted2 small">Connexion administrateur</div>
               </div>
             </div>
 
             <form id="loginForm" class="vstack gap-3">
               <div>
+                <label class="form-label small text-muted2 mb-1">Nom d’utilisateur</label>
+                <input id="username" class="form-control bg-dark text-white border-0" type="text" required placeholder="ex: super" autocomplete="username" />
+              </div>
+
+              <div>
                 <label class="form-label small text-muted2 mb-1">PIN</label>
                 <input id="pin" class="form-control bg-dark text-white border-0" type="password" required
                   placeholder="••••" />
-                <div class="form-text text-muted2">⚠️ Veuillez saisir le code pin.</div>
+                <div class="form-text text-muted2">Entrez votre nom d’utilisateur et votre PIN.</div>
               </div>
 
-              <button class="btn btn-primary w-100" type="submit">Accéder</button>
+              <button id="loginBtn" class="btn btn-primary w-100" type="submit">Connexion</button>
               <div id="loginMsg" class="small"></div>
             </form>
           </div>
@@ -50,27 +55,52 @@
   </main>
 
   <script src="./assets/config.js"></script>
-  <script>
-    const form = document.getElementById("loginForm");
-    const msg = document.getElementById("loginMsg");
+<script src="./assets/api.js"></script>
+<script>
+  const form = document.getElementById("loginForm");
+  const msg = document.getElementById("loginMsg");
+  const btn = document.getElementById("loginBtn");
+  const usernameEl = document.getElementById("username");
+  const pinEl = document.getElementById("pin");
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      msg.textContent = "";
-      msg.className = "small";
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    msg.textContent = "";
+    msg.className = "small mt-3 text-center";
 
-      const pin = document.getElementById("pin").value.trim();
-      const expected = (window.POINTAGE_CONFIG && window.POINTAGE_CONFIG.ADMIN_PIN) ? String(window.POINTAGE_CONFIG.ADMIN_PIN) : "1234";
+    const username = (usernameEl.value || "").trim();
+    const pin = (pinEl.value || "").trim();
+    if(!username || !pin){
+      msg.textContent = "Veuillez saisir votre nom d’utilisateur et votre PIN.";
+      msg.className = "small mt-3 text-center text-danger";
+      return;
+    }
 
-      if (pin !== expected) {
-        msg.textContent = "PIN incorrect.";
-        msg.className = "small text-danger";
+    const old = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Connexion...';
+
+    try{
+      const res = await apiLogin(username, pin);
+      if(!res.ok){
+        msg.textContent = res.error === "BAD_CREDENTIALS" ? "Nom d’utilisateur / PIN incorrect." : ("Erreur: " + (res.error||"UNKNOWN"));
+        msg.className = "small mt-3 text-center text-danger";
         return;
       }
-      sessionStorage.setItem("pointage_authed", "1");
+      localStorage.setItem("sessionToken", res.sessionToken);
+      localStorage.setItem("role", String(res.role || "").toUpperCase());
+      localStorage.setItem("username", res.username || username);
       location.href = "./admin.html";
-    });
-  </script>
+    }catch(err){
+      console.error(err);
+      msg.textContent = "Impossible de contacter l’API (Apps Script).";
+      msg.className = "small mt-3 text-center text-danger";
+    }finally{
+      btn.disabled = false;
+      btn.innerHTML = old;
+    }
+  });
+</script>
 </body>
 
 </html>

@@ -24,8 +24,9 @@
         <span class="fw-bold">Pointage</span>
       </a>
 
-      <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-outline-light btn-sm" href="./reports.html">Rapports</a>
+      <div id="navActions" class="d-flex align-items-center gap-2 ms-auto justify-content-end flex-nowrap">
+        <a class="btn btn-outline-light btn-sm" href="./reports.html" data-super-only>Rapports</a>
+        <span id="userPill" class="user-pill"></span>
         <button id="logoutBtn" class="btn btn-outline-light btn-sm">Déconnexion</button>
       </div>
     </div>
@@ -36,7 +37,7 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h2 class="h5 mb-1">Volontaires : 12h - 18h</h2>
+            <h2 class="h5 mb-1 text-white">Volontaires : 12h - 18h</h2>
             <div id="today" class="text-muted2 small"></div>
           </div>
           <div class="d-flex align-items-center gap-2">
@@ -46,19 +47,33 @@
         </div>
 
         <div class="row g-2 mt-2">
-          <div class="col-12 col-md-8">
+          <div class="col-12 col-md-6">
             <input id="search" class="form-control bg-dark text-white border-0"
               placeholder="🔎 Rechercher (nom ou code badge)..." />
           </div>
-          <div class="col-6 col-md-2 d-grid">
-            <button id="clearSearchBtn" class="btn btn-outline-light">Effacer</button>
+
+          <div class="col-6 col-md-2">
+            <select id="groupFilter" class="form-select bg-dark text-white border-0">
+              <option value="">Tous les groupes</option>
+              <option value="A">Groupe A</option>
+              <option value="B">Groupe B</option>
+            </select>
           </div>
-          <div class="col-6 col-md-2 d-grid">
+
+          <div class="col-3 col-md-2 d-grid">
+            <button id="clearSearchBtn" class="btn btn-outline-light" type="button" aria-label="Effacer la recherche">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.646 2.646a.5.5 0 0 1 .708 0L8 7.293l4.646-4.647a.5.5 0 0 1 .708.708L8.707 8l4.647 4.646a.5.5 0 0 1-.708.708L8 8.707l-4.646 4.647a.5.5 0 0 1-.708-.708L7.293 8 2.646 3.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="col-3 col-md-2 d-grid">
             <button id="openAddBtn" class="btn btn-primary">+ Ajouter</button>
           </div>
         </div>
 
-        <div id="list" class="vstack gap-2 mt-3"></div>
+<div id="list" class="vstack gap-2 mt-3"></div>
 
         <div id="toast"
           class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white"
@@ -66,6 +81,68 @@
       </div>
     </div>
   </main>
+
+
+  
+  <!-- Historique Modal (SUPER ADMIN) -->
+  <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content bg-dark text-white border border-light border-opacity-25">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title mb-0">Historique de pointage</h5>
+            <div id="histSubtitle" class="small text-muted2"></div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-4">
+              <label class="form-label">Du</label>
+              <input type="date" id="histFrom" class="form-control">
+            </div>
+            <div class="col-6 col-md-4">
+              <label class="form-label">Au</label>
+              <input type="date" id="histTo" class="form-control">
+            </div>
+            <div class="col-12 col-md-4 d-grid">
+              <button id="histLoadBtn" class="btn btn-outline-light">
+                Charger
+              </button>
+            </div>
+          </div>
+
+          <div id="histMsg" class="small mt-3"></div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-dark table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th style="min-width:130px;">Date</th>
+                  <th style="min-width:90px;">Heure</th>
+                  <th>Nom</th>
+                  <th style="min-width:140px;">Badge</th>
+                </tr>
+              </thead>
+              <tbody id="histTbody">
+                <tr><td colspan="4" class="text-muted2 small">Aucun chargement.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-light" data-bs-dismiss="modal">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- Global Loader -->
+  <div id="pageLoader" class="page-loader" aria-hidden="true">
+    <div class="loader-card">
+      <div class="spinner-border" role="status" aria-label="Chargement"></div>
+      <div id="loaderText" class="mt-2 small text-white">Chargement...</div>
+    </div>
+  </div>
 
 
   <!-- Add Volunteer Modal -->
@@ -93,6 +170,22 @@
               <input id="phone" class="form-control bg-black text-white border-0" placeholder="Ex: 06..." />
               <div class="form-text text-muted2">Optionnel</div>
             </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Groupe</label>
+              
+<div class="d-flex gap-3 mt-1">
+  <label class="form-check text-white">
+    <input class="form-check-input" type="radio" name="groupAdd" id="groupAddA" value="A" checked>
+    <span class="form-check-label">A</span>
+  </label>
+  <label class="form-check text-white">
+    <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
+    <span class="form-check-label">B</span>
+  </label>
+</div>
+<input type="hidden" id="group" value="A">
+</div>
+            </div>
 
             <button class="btn btn-primary mt-2" type="submit">Enregistrer</button>
             <div id="addMsg" class="small"></div>
@@ -104,6 +197,59 @@
 
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Edit Volunteer Modal -->
+  <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-light-subtle" style="border-radius:18px;">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Modifier le volontaire</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body pt-0">
+          <form id="editForm" class="vstack gap-2">
+            <input type="hidden" id="editId" />
+            <div>
+              <label class="form-label small text-muted2 mb-1">Nom complet</label>
+              <input id="editFullName" class="form-control bg-black text-white border-0" required />
+            </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Code badge</label>
+              <input id="editBadgeCode" class="form-control bg-black text-white border-0" />
+              <div class="form-text text-muted2">Optionnel (unique)</div>
+            </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Téléphone</label>
+              <input id="editPhone" class="form-control bg-black text-white border-0" />
+              <div class="form-text text-muted2">Optionnel</div>
+            </div>
+            <div>
+              <label class="form-label small text-muted2 mb-1">Groupe</label>
+              
+<div class="d-flex gap-3 mt-1">
+  <label class="form-check text-white">
+    <input class="form-check-input" type="radio" name="groupEdit" id="groupEditA" value="A" checked>
+    <span class="form-check-label">A</span>
+  </label>
+  <label class="form-check text-white">
+    <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
+    <span class="form-check-label">B</span>
+  </label>
+</div>
+<input type="hidden" id="editGroup" value="A">
+</div>
+            </div>
+
+            <button class="btn btn-primary mt-2" type="submit">Mettre à jour</button>
+            <div id="editMsg" class="small"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="groupDatalist"></datalist>
+
   <script src="./assets/config.js"></script>
   <script src="./assets/auth.js"></script>
   <script src="./assets/api.js"></script>

@@ -1,10 +1,20 @@
-function isAuthed(){
-  return sessionStorage.getItem("pointage_authed") === "1";
+function getRole(){
+  return localStorage.getItem("role") || "";
 }
-function requireAuth(){
-  if (!isAuthed()) location.href = "./index.html";
+function isAuthed(){
+  return !!localStorage.getItem("sessionToken");
+}
+function requireAdmin(){
+  if(!isAuthed()) location.href = "./index.html";
+}
+function requireSuperAdmin(){
+  if(!isAuthed()) location.href = "./index.html";
+  const role = getRole();
+  if(role !== "SUPER_ADMIN") location.href = "./admin.html";
 }
 function logout(){
-  sessionStorage.removeItem("pointage_authed");
+  localStorage.removeItem("sessionToken");
+  localStorage.removeItem("role");
+  localStorage.removeItem("username");
   location.href = "./index.html";
 }

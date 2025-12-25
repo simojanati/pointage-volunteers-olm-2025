@@ -64,3 +64,122 @@ code{
   border: 1px solid rgba(255,255,255,.14);
   color: #fff;
 }
+
+
+/* Loader overlay */
+.page-loader{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+}
+.page-loader .loader-card{
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  padding: 18px 22px;
+  min-width: 220px;
+  text-align: center;
+  box-shadow: 0 12px 35px rgba(0,0,0,.35);
+}
+.page-loader .spinner-border{
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+.toast-pill{ color:#fff !important; }
+
+/* Force key texts to be readable */
+.list-card .fw-bold{ color:#fff !important; }
+
+
+/* User pill (header) */
+.user-pill{
+  white-space: nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:.25rem;
+  padding:.45rem .7rem;
+  border-radius:999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  color:#fff;
+  font-weight:600;
+  line-height:1;
+}
+.badge-role-super{
+  background: var(--mor-red);
+  color:#fff;
+}
+.badge-role-admin{
+  background: rgba(255,255,255,.18);
+  color:#fff;
+  border: 1px solid rgba(255,255,255,.18);
+}
+.badge-role-unknown{
+  background: rgba(255,255,255,.10);
+  color:#fff;
+}
+
+
+/* Custom modal (Absences) */
+.olm-modal{
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.olm-modal.d-none{ display:none !important; }
+.olm-modal-backdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px);
+}
+.olm-modal-card{
+  position:relative;
+  width: min(920px, 100%);
+  max-height: 86vh;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(18,22,28,.96);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  display:flex;
+  flex-direction: column;
+}
+.olm-modal-header{
+  padding: 14px 14px;
+  display:flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.olm-modal-title{ font-size: 18px; font-weight: 800; color: #fff; }
+.olm-modal-sub{ font-size: 12px; color: rgba(255,255,255,.65); margin-top: 2px; }
+.olm-modal-body{
+  padding: 14px 14px;
+  overflow: auto;
+}
+.olm-modal-footer{
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  display:flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+
+
+/* clickable absences badge */
+.abs-day-btn{ cursor: pointer; user-select:none; }
+.abs-day-btn:focus{ outline: 2px solid rgba(255,255,255,.35); outline-offset: 2px; border-radius: 999px; }
+.abs-day-btn:hover{ filter: brightness(1.08); }

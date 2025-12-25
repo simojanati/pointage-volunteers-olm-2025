@@ -1,7 +1,16 @@
+function getSessionToken(){
+  return localStorage.getItem("sessionToken") || "";
+}
+
 function jsonpRequest(params) {
   const { API_URL, TOKEN } = window.POINTAGE_CONFIG || {};
   if (!API_URL || API_URL.includes("PASTE_")) throw new Error("API_URL not configured");
   if (!TOKEN || TOKEN.includes("PASTE_")) throw new Error("TOKEN not configured");
+
+  // attach sessionToken to every request except login
+  if (params?.action !== "login") {
+    params.sessionToken = params.sessionToken || getSessionToken();
+  }
 
   return new Promise((resolve, reject) => {
     const cb = "cb_" + Math.random().toString(36).slice(2);
@@ -23,6 +32,7 @@ function jsonpRequest(params) {
   });
 }
 
+
 async function apiListVolunteers(search="") {
   return jsonpRequest({ action:"listVolunteers", search });
 }
@@ -41,10 +51,32 @@ async function apiReportPunches(fromISO, toISO) {
 
 function isoDate(d){ return d.toISOString().slice(0,10); }
 
-async function apiAddVolunteer(fullName, badgeCode="", phone="") {
-  return jsonpRequest({ action:"addVolunteer", fullName, badgeCode, phone });
+async function apiAddVolunteer(fullName, badgeCode="", phone="", group="") {
+  return jsonpRequest({ action:"addVolunteer", fullName, badgeCode, phone, group });
 }
 
 async function apiDeletePunch(volunteerId, dateISO) {
   return jsonpRequest({ action:"deletePunch", volunteerId: String(volunteerId), date: dateISO });
+}
+
+
+async function apiUpdateVolunteer(id, fullName, badgeCode="", phone="", group="") {
+  return jsonpRequest({ action:"updateVolunteer", id: String(id), fullName, badgeCode, phone, group });
+}
+
+
+async function apiLogin(username, pin){
+  return jsonpRequest({ action:"login", username, pin });
+}
+
+async function apiMe(){
+  return jsonpRequest({ action:"me" });
+}
+
+async function apiDashboardStats(from, to, group){
+  return jsonpRequest({ action:"dashboardStats", from, to, group });
+}
+
+async function apiVolunteerHistory(volunteerId, from, to){
+  return jsonpRequest({ action:"volunteerHistory", volunteerId: String(volunteerId), from, to });
 }

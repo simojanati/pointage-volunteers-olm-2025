@@ -51,3 +51,32 @@ Dans votre repo :
 - Popup **Ajouter un volontaire**
 - Bouton **Annuler** (supprime le pointage du jour)
 - Cache côté navigateur pour réduire la charge (liste chargée une seule fois)
+
+
+## Update volontaire (v3)
+- Bouton ✏️ **Modifier** dans la liste (admin)
+- Modification: Nom complet, Badge, Téléphone
+- Badge unique (contrôle côté Apps Script)
+- Option: met à jour aussi badge/nom dans la feuille Punches
+
+
+## Mise à jour (v13) — Login Username + PIN + Rôles
+
+### 1) Google Sheet
+Créez une feuille `Users` avec ces colonnes :
+`username | pin | role | active`
+
+Exemple :
+- super | 123456 | SUPER_ADMIN | TRUE
+- agent1 | 111111 | ADMIN | TRUE
+
+### 2) Apps Script
+Copiez/collez `apps-script/Code.gs` dans votre projet Apps Script, puis :
+- Project Settings → Time zone : Africa/Casablanca
+- Deploy → Manage deployments → Edit → New version → Deploy
+- Copiez l'URL `/exec` dans `assets/config.js`
+
+⚠️ Dans `apps-script/Code.gs`, remplacez `TOKEN` par la même valeur que `assets/config.js`.
+
+### 3) GitHub Pages
+Déployez en static comme avant.
