@@ -183,3 +183,17 @@ code{
 .abs-day-btn{ cursor: pointer; user-select:none; }
 .abs-day-btn:focus{ outline: 2px solid rgba(255,255,255,.35); outline-offset: 2px; border-radius: 999px; }
 .abs-day-btn:hover{ filter: brightness(1.08); }
+
+
+/* QR Scan page */
+.qr-reader-wrap{ width:100%; display:flex; justify-content:center; }
+.qr-reader{
+  width: min(520px, 100%);
+  min-height: 320px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.22);
+}
+.qr-reader video{ width:100% !important; height:auto !important; border-radius: 18px; }
+.qr-missing-icon{ cursor: help; }

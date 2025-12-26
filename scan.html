@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pointage - Scan QR</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="icon" href="./assets/icon/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/icon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/icon/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="./assets/icon/apple-touch-icon.png">
+  <link rel="manifest" href="./assets/icon/site.webmanifest">
+  <meta name="theme-color" content="#c8102e">
+</head>
+
+<body class="text-white">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-transparent">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="./admin.html">
+        <span class="logo-slot" aria-hidden="true"><img src="assets/MAR25.webp" class="img-fluid rounded-3"
+            alt="AFCON Morocco 2025"></span>
+        <span class="fw-bold">Scan QR</span>
+      </a>
+
+      <div id="navActions" class="d-flex align-items-center gap-2 ms-auto justify-content-end flex-nowrap">
+        <a class="btn btn-outline-light btn-sm" href="./admin.html">← Retour</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-outline-light btn-sm">Déconnexion</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-3">
+    <div class="card bg-glass shadow-lg">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h2 class="h5 mb-1 text-white">Scanner le QR / code badge</h2>
+            <div class="text-muted2 small">Scan dghya باش تـPointi المتطوعين بلا ما تبقا تقلب فاللائحة.</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button id="toggleScanBtn" class="btn btn-primary btn-sm">▶️ Démarrer</button>
+            <button id="switchCamBtn" class="btn btn-outline-light btn-sm">🔄 Caméra</button>
+          </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+          <div class="col-12 col-lg-7">
+            <div class="qr-reader-wrap">
+              <div id="qrReader" class="qr-reader"></div>
+            </div>
+            <div id="scanStatus" class="mt-3 small"></div>
+            <div class="text-muted2 small mt-2">
+              ⚠️ الكاميرا خاصها HTTPS (ولا localhost) و permission.
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-5">
+            <div class="p-3 rounded-4 border border-light border-opacity-10" style="background:rgba(0,0,0,.18)">
+              <div class="fw-bold mb-2">Fallback (يدوي)</div>
+              <div class="text-muted2 small mb-2">إلى ما خداماش الكاميرا، لسّق/كتب الكود هنا:</div>
+              <div class="input-group">
+                <input id="manualCode" class="form-control bg-dark text-white border-0" placeholder="Ex: 00034500-1" />
+                <button id="manualSubmit" class="btn btn-outline-light">Valider</button>
+              </div>
+              <div class="text-muted2 small mt-3">
+                نصيحة: منين كتسكان، خرج QR من الكادر شوية باش ما يرجعش يتقرا نفس الكود بزاف.
+              </div>
+            </div>
+
+            <div class="mt-3 p-3 rounded-4 border border-light border-opacity-10" style="background:rgba(0,0,0,.18)">
+              <div class="fw-bold mb-2">آخر Scan</div>
+              <div id="lastScan" class="small text-muted2">—</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"
+    class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white"
+    style="opacity:0; transition: opacity .2s;"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./assets/config.js"></script>
+  <script src="./assets/api.js"></script>
+  <script src="./assets/auth.js"></script>
+
+  <!-- QR Scanner lib -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <script src="./assets/scan.js"></script>
+</body>
+
+</html>

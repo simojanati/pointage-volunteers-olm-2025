@@ -2,6 +2,7 @@ const listEl = document.getElementById("list");
 const searchEl = document.getElementById("search");
 const groupFilterEl = document.getElementById("groupFilter");
 const refreshBtn = document.getElementById("refreshBtn");
+const scanBtn = document.getElementById("scanBtn");
 const countPill = document.getElementById("countPill");
 const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
@@ -81,8 +82,7 @@ if (editModalEl && window.bootstrap?.Modal) {
     histMsg.textContent = '';
     histMsg.className = 'small mt-3';
     histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Chargement…</td></tr>';
-    setBtnLoading(submitBtn, true, "Enregistrement...");
-    setInlineSpinner(addSpinnerEl, true);
+    setBtnLoading(histLoadBtn, true, "Chargement...");
 
     try{
       const res = await apiVolunteerHistory(currentHistVolunteer.id, from, to);
@@ -106,13 +106,20 @@ if (editModalEl && window.bootstrap?.Modal) {
       }
       histTbody.innerHTML = rows.map(r=>{
         const time = r.punched_at ? new Date(r.punched_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-        return `<tr><td>${escapeHtml(r.punch_date||'')}</td><td>${escapeHtml(time)}</td><td>${escapeHtml(r.full_name||'')}</td><td>${escapeHtml(r.badge_code||'')}</td></tr>`;
+        return `<tr>`+
+          `<td>${escapeHtml(r.punch_date||'')}</td>`+
+          `<td>${escapeHtml(time)}</td>`+
+          `<td>${escapeHtml(r.full_name||'')}</td>`+
+          `<td>${escapeHtml(r.badge_code||'')}</td>`+
+        `</tr>`;
       }).join('');
     }catch(e){
       console.error(e);
       histMsg.textContent = 'Erreur API.';
       histMsg.className = 'small mt-3 text-danger';
     }
+    finally{ setBtnLoading(histLoadBtn, false); }
+
   });
 }
 const editForm = document.getElementById("editForm");
@@ -132,7 +139,10 @@ const groupEl = document.getElementById("group");
 const editGroupEl = document.getElementById("editGroup");
 const groupDatalistEl = document.getElementById("groupDatalist");
 
-let punchedMap = new Map();     // volunteer_id -> punched_at
+let punchedMap = new Map();
+
+let todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0,10);
+     // volunteer_id -> punched_at
 let volunteersCache = [];       // cached volunteers
 let lastLoadedAt = 0;
 
@@ -260,7 +270,7 @@ async function refreshTodayPunches(){
   const today = isoDate(new Date());
   const r = await apiReportPunches(today, today);
   if (!r.ok) throw new Error(r.error || "REPORT_ERROR");
-  punchedMap = new Map((r.punches || []).map(p => [String(p.volunteer_id), p.punched_at]));
+  punchedMap = new Map(((r.rows || r.punches || [])).map(p => [String(p.volunteer_id), p.punched_at]));
   return today;
 }
 
@@ -307,37 +317,43 @@ function render(volunteers, todayISO) {
       : `<span class="badge text-bg-secondary">• Non pointé</span>`;
 
     const btnPunch = punchedToday
-      ? `<button class="btn btn-outline-light btn-sm" disabled>Pointé</button>`
+      ? ``
       : `<button class="btn btn-primary btn-sm" data-action="punch" data-id="${escapeHtml(vid)}">Pointage</button>`;
 
-    const btnEdit = isSuper() ? `<button class="btn btn-outline-light btn-sm px-2" data-action="edit" data-id="${escapeHtml(vid)}" title="Modifier">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-9.5 9.5a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2L2 11.207V13h1.793L14 3.793z"/>
-        </svg>
-      </button>` : ``;
-      const btnHist = `<button class="btn btn-outline-light btn-sm px-2" data-action="history" data-id="${escapeHtml(vid)}" title="Historique">🕘</button>`;
+    const btnEdit = isSuper()
+      ? `<button class="btn btn-outline-light btn-sm" data-action="edit" data-id="${escapeHtml(vid)}" title="Modifier">✏️</button>`
+      : ``;
+
+    const btnHist = `<button class="btn btn-outline-light btn-sm" data-action="history" data-id="${escapeHtml(vid)}" title="Historique">🕘</button>`;
 
     const btnUndo = punchedToday
-      ? `<button class="btn btn-outline-warning btn-sm" data-action="undo" data-id="${escapeHtml(vid)}" title="Annuler le pointage">Annuler</button>`
+      ? `<button class="btn btn-warning btn-sm text-dark" data-action="undo" data-id="${escapeHtml(vid)}" title="Annuler le pointage">Annuler</button>`
       : ``;
 
     const timeBadge = punchedToday
       ? `<span class="badge badge-soft text-white">⏱ ${(punchedAt || "").slice(11,16)}</span>`
       : "";
 
+    const grp = normGroup(v.group || v.groupe || "");
+
+    const missingQr = !String(v.badgeCode || "").trim();
+    const qrWarn = missingQr
+      ? `<span class="ms-1 text-warning qr-missing-icon" title="هاد المتطوع ماعندوش QR/Code badge — خاصو يتزاد ليه باش يقدر يتسكان.">⚠️</span>`
+      : ``;
+
     return `
       <div class="list-card p-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
         <div class="w-100">
           <div class="fw-bold text-truncate text-white">${escapeHtml(v.fullName || "")}</div>
           <div class="d-flex flex-wrap gap-2 mt-2">
-            ${v.badgeCode ? `<span class="badge badge-soft text-white">🏷 ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷 (Sans badge)</span>`}
-            ${v.phone ? `<span class="badge badge-soft text-white">📞 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 (Sans téléphone)</span>`}
-            ${v.group ? `<span class="badge badge-soft text-white">👥 Groupe ${escapeHtml(String(v.group).toUpperCase())}</span>` : `<span class="badge badge-soft text-white">👥 Groupe (Non défini)</span>`}
+            ${v.badgeCode ? `<span class="badge badge-soft text-white">🏷 ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷 (Sans badge)</span>`}${qrWarn}
+            ${v.phone ? `<span class="badge badge-soft text-white">📞 +212 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 (Sans téléphone)</span>`}
+            ${grp ? `<span class="badge badge-soft text-white">👥 Groupe ${escapeHtml(grp)}</span>` : `<span class="badge badge-soft text-white">👥 Groupe (Non défini)</span>`}
             ${timeBadge}
             ${status}
           </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           ${btnEdit}${btnHist}
           ${btnUndo}
           ${btnPunch}
@@ -345,61 +361,6 @@ function render(volunteers, todayISO) {
       </div>
     `;
   }).join("");
-
-  listEl.querySelectorAll("button[data-action]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      let skipReload = false;
-      const id = btn.dataset.id;
-      const action = btn.dataset.action;
-      btn.disabled = true;
-      btn.textContent = "...";
-
-    const submitBtn = addForm.querySelector("button[type=\"submit\"]");
-    setBtnLoading(submitBtn, true, "Enregistrement...");
-
-    try{
-        if (action === "punch"){
-          const res = await apiPunch(id, todayISO);
-          if (!res.ok){
-            toast("Erreur: " + (res.error || "UNKNOWN"));
-          }else{
-            toast("✅ Pointage enregistré");
-          }
-        }else if (action === "edit"){ 
-          const v = getVolunteerById(id);
-          if(!v) { toast("Volontaire introuvable."); return; }
-
-          editMsg.textContent = "";
-          editMsg.className = "small";
-          editIdEl.value = String(v.id);
-          editFullNameEl.value = v.fullName || "";
-          editBadgeCodeEl.value = v.badgeCode || "";
-          editPhoneEl.value = v.phone || "";
-        setGroupRadios("groupEdit", v.group || "A");
-          // reset submit button state every time modal opens
-      const editSubmitBtn = editForm?.querySelector('button[type="submit"]');
-      resetBtn(editSubmitBtn, "Mettre à jour");
-      editModal?.show();
-          skipReload = true;
-          return;
-        }else if (action === "undo"){
-          const ok = confirm("Annuler le pointage de ce volontaire pour aujourd'hui ?");
-          if(!ok) return;
-          const res = await apiDeletePunch(id, todayISO);
-          if (!res.ok){
-            toast("Erreur: " + (res.error || "UNKNOWN"));
-          }else{
-            toast("↩️ Pointage annulé");
-          }
-        }
-      }catch(e){
-        console.error(e);
-        toast("Erreur API (Apps Script).");
-      }finally{
-        if(!skipReload) await load(false, false);
-      }
-    });
-  });
 }
 
 function setLoading(msg="Chargement..."){
@@ -409,6 +370,13 @@ function setLoading(msg="Chargement..."){
       <span>${escapeHtml(msg)}</span>
     </div>
   `;
+}
+
+
+function renderFromCache(){
+  const q = (searchEl?.value || "").trim();
+  const filtered = filterLocal(q);
+  render(filtered, todayISO);
 }
 
 async function load(forceReloadVolunteers = false, showOverlay = false) {
@@ -425,7 +393,7 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
 
   try{
     // Always refresh today's punches (light)
-    const todayISO = await refreshTodayPunches();
+    todayISO = await refreshTodayPunches();
     todayEl.textContent = `Aujourd'hui : ${todayISO}`;
 
     // Fast cache render (optional) to reduce first-load perceived latency
@@ -475,7 +443,13 @@ function bindUI(){
   try{ const g = localStorage.getItem("pointage_group_filter") || ""; if(groupFilterEl) groupFilterEl.value = g; }catch(e){}
 }
 
+scanBtn?.addEventListener("click", ()=>{
+  // Admin + Super admin
+  location.href = "./scan.html";
+});
+
 refreshBtn?.addEventListener("click", () => load(true, true));
+scanBtn?.addEventListener("click", () => { location.href = "./scan.html"; });
   focusSearchBtn?.addEventListener('click', ()=>{ searchEl.focus(); searchEl.select(); });
   // mobile: focus on first tap anywhere
   let firstTapFocused=false;
@@ -516,7 +490,9 @@ refreshBtn?.addEventListener("click", () => load(true, true));
         }else{
           toast("✅ Pointage enregistré");
         }
-        await load(false, false);
+        todayISO = await refreshTodayPunches();
+        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+        renderFromCache();
       }
 
       if(action === "undo"){
@@ -527,7 +503,9 @@ refreshBtn?.addEventListener("click", () => load(true, true));
         }else{
           toast("✅ Pointage annulé");
         }
-        await load(false, false);
+        todayISO = await refreshTodayPunches();
+        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+        renderFromCache();
       }
 
       if(action === "edit"){
@@ -551,16 +529,20 @@ refreshBtn?.addEventListener("click", () => load(true, true));
     }
   });
 
-clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, false); });
+clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; renderFromCache(); });
 
-  let debounce;
+let debounce;
   searchEl?.addEventListener("input", ()=>{
     clearTimeout(debounce);
-    debounce = setTimeout(()=> load(false), 140);
+    debounce = setTimeout(()=>{
+      renderFromCache();
+    }, 120);
   });
-  groupFilterEl?.addEventListener("change", ()=>{ try{ localStorage.setItem("pointage_group_filter", groupFilterEl.value||""); }catch(e){} load(false); });
-
-  logoutBtn?.addEventListener("click", logout);
+  groupFilterEl?.addEventListener("change", ()=>{
+    try{ localStorage.setItem("pointage_group_filter", groupFilterEl.value||""); }catch(e){}
+    renderFromCache();
+  });
+logoutBtn?.addEventListener("click", logout);
 
   openAddBtn?.addEventListener("click", ()=>{
     addMsg.textContent = "";
@@ -621,7 +603,7 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
       phoneEl.value = "";
 
       setTimeout(()=> addModal?.hide(), 500);
-      await load(false, false);
+      renderFromCache();
 
     }catch(err){
       console.error(err);
@@ -687,7 +669,7 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
       setInlineSpinner(editSpinnerEl, false);
 
       // re-render after refresh punches (to ensure status ok)
-      await load(false, false);
+      renderFromCache();
 
       // hide after small delay
       setTimeout(()=> editModal?.hide(), 450);
