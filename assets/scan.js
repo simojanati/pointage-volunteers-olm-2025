@@ -117,6 +117,19 @@ let scanning = false;
 let processing = false;
 let lastCode = '';
 let lastAt = 0;
+let usingDeviceId = false;
+let currentFacingMode = 'environment'; // fallback when camera list is not available (iOS/Safari)
+
+function pickRearCameraIndex(list){
+  if(!Array.isArray(list) || !list.length) return 0;
+  // labels are available after permission is granted
+  const labelRegex = /back|rear|environment|arrière|arri[èe]re/i;
+  const idxByLabel = list.findIndex(c => labelRegex.test(c.label || ''));
+  if(idxByLabel >= 0) return idxByLabel;
+  // common: last camera is the rear one
+  if(list.length >= 2) return list.length - 1;
+  return 0;
+}
 
 async function ensureCameras(){
   if(!window.Html5Qrcode){
@@ -142,11 +155,16 @@ async function ensureCameras(){
 }
 
 
-function pickCameraId(){
+function pickCameraRequest(){
+  // Preferred: explicit deviceId (rear by default)
   if(cameras?.length){
-    return cameras[camIndex % cameras.length].id;
+    usingDeviceId = true;
+    const cam = cameras[camIndex % cameras.length];
+    return { deviceId: { exact: cam.id } };
   }
-  return { facingMode: 'environment' };
+  // Fallback: facingMode (some browsers don't expose camera list)
+  usingDeviceId = false;
+  return { facingMode: currentFacingMode || 'environment' };
 }
 
 async function startScan(){
@@ -154,6 +172,10 @@ async function startScan(){
   await loadVolunteers();
 
   const cams = await ensureCameras();
+  // Default to rear camera when a list is available
+  if(cams?.length){
+    camIndex = pickRearCameraIndex(cams);
+  }
   if(!cams.length && location.protocol !== 'https:' && location.hostname !== 'localhost'){
     setStatus('La caméra nécessite HTTPS (ou localhost) et une autorisation.', 'warning');
   }
@@ -162,7 +184,7 @@ async function startScan(){
     html5QrCode = new Html5Qrcode('qrReader');
   }
 
-  const camera = pickCameraId();
+  const camera = pickCameraRequest();
   setStatus('📷 Préparation de la caméra...', '');
   toggleScanBtn.textContent = '⏸️ Pause';
 
@@ -179,7 +201,7 @@ async function startScan(){
       () => {}
     );
     scanning = true;
-    setStatus('✅ Scanner prêt… présentez le QR devant la caméra.', 'success');
+    setStatus('✅ Caméra arrière prête… présentez le code QR devant la caméra.', 'success');
   }catch(e){
     scanning = false;
     toggleScanBtn.textContent = '▶️ Démarrer';
@@ -200,12 +222,25 @@ async function stopScan(){
 }
 
 async function switchCamera(){
-  await ensureCameras();
-  if(!cameras.length){
-    toast('Aucune caméra détectée.');
+  const cams = await ensureCameras();
+
+  // If the browser doesn't expose device list (common on iOS), toggle facingMode
+  if(!cams.length){
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    toast(currentFacingMode === 'environment' ? 'Caméra arrière.' : 'Caméra frontale.');
+    if(scanning){
+      await stopScan();
+      await startScan();
+    }
     return;
   }
-  camIndex = (camIndex + 1) % cameras.length;
+
+  if(cams.length === 1){
+    toast('Une seule caméra détectée.');
+    return;
+  }
+
+  camIndex = (camIndex + 1) % cams.length;
   toast('Caméra changée.');
   if(scanning){
     await stopScan();
