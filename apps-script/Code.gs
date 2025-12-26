@@ -1,7 +1,7 @@
 /**
  * Google Apps Script (Web App) for Pointage (JSONP compatible)
  * Sheets required:
- *  - Volunteers: id | full_name | badge_code | phone
+ *  - Volunteers: id | full_name | badge_code | qr_code | phone | group
  *  - Punches: punch_date | volunteer_id | punched_at | badge_code | full_name
  *  - Users: username | pin | role | active
  */
@@ -206,6 +206,7 @@ function listVolunteers(search){
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
   if(!sh) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
   ensureHeader(sh, "group");
+  ensureHeader(sh, "qr_code");
   const h = headerIndex(sh);
   if(!h.ok) return h;
 
@@ -218,15 +219,16 @@ function listVolunteers(search){
     const id = r[idx.id];
     const fullName = String(r[idx["full_name"]]||"").trim();
     const badgeCode = String(r[idx["badge_code"]]||"").trim();
+    const qrCode = (idx["qr_code"] !== undefined) ? String(r[idx["qr_code"]]||"").trim() : "";
     const phone = String(r[idx.phone]||"").trim();
     const group = pickGroup(idx, r);
     if(!id) return;
 
     if(q){
-      const hay = norm(fullName) + " " + norm(badgeCode);
+      const hay = norm(fullName) + " " + norm(badgeCode) + " " + norm(qrCode) + " " + norm(phone) + " " + norm(group);
       if(!hay.includes(q)) return;
     }
-    out.push({ id, fullName, badgeCode, phone, group });
+    out.push({ id, fullName, badgeCode, qrCode, phone, group });
   });
 
   return { ok:true, volunteers: out };
@@ -313,6 +315,7 @@ function deletePunch(p){
 function addVolunteer(p){
   const fullName = String(p.fullName || "").trim();
   const badgeCode = String(p.badgeCode || "").trim();
+  const qrCode = String(p.qrCode || "").trim();
   const phone = String(p.phone || "").trim();
   const group = String(p.group || "").trim();
   if(!fullName) return { ok:false, error:"NAME_REQUIRED" };
@@ -320,6 +323,7 @@ function addVolunteer(p){
   const shV = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
   if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
   ensureHeader(shV, "group");
+  ensureHeader(shV, "qr_code");
   const hv = headerIndex(shV);
   if(!hv.ok) return hv;
   const iv = hv.idx;
@@ -328,6 +332,12 @@ function addVolunteer(p){
   if(badgeCode){
     const exists = hv.values.slice(1).some(r => String(r[iv["badge_code"]]||"").trim() === badgeCode);
     if(exists) return { ok:false, error:"BADGE_ALREADY_EXISTS" };
+  }
+
+  // unique qr_code
+  if(qrCode){
+    const existsQr = hv.values.slice(1).some(r => String(r[iv["qr_code"]]||"").trim() === qrCode);
+    if(existsQr) return { ok:false, error:"QR_ALREADY_EXISTS" };
   }
 
   // new id = max(id)+1
@@ -339,6 +349,7 @@ function addVolunteer(p){
     if(hname === "id") row.push(newId);
     else if(hname === "full_name") row.push(fullName);
     else if(hname === "badge_code") row.push(badgeCode);
+    else if(hname === "qr_code") row.push(qrCode);
     else if(hname === "phone") row.push(phone);
     else if(hname === "group") row.push(group);
     else row.push("");
@@ -362,6 +373,7 @@ function updateVolunteer(p){
   if(!shP) return { ok:false, error:"PUNCH_SHEET_NOT_FOUND" };
 
   ensureHeader(shV, "group");
+  ensureHeader(shV, "qr_code");
   ensureHeader(shP, "group");
   const hv = headerIndex(shV);
   const hp = headerIndex(shP);
@@ -390,10 +402,19 @@ function updateVolunteer(p){
     if(exists) return { ok:false, error:"BADGE_ALREADY_EXISTS" };
   }
 
+
+  // unique qr_code (excluding current id)
+  if(qrCode){
+    const rows2 = hv.values.slice(1).filter(r => String(r[iv.id]) !== id);
+    const existsQr = rows2.some(r => String(r[iv["qr_code"]]||"").trim() === qrCode);
+    if(existsQr) return { ok:false, error:"QR_ALREADY_EXISTS" };
+  }
+
   // Update volunteer row
   const update = {};
   update[iv["full_name"]] = fullName;
   update[iv["badge_code"]] = badgeCode;
+  if(iv["qr_code"] !== undefined) update[iv["qr_code"]] = qrCode;
   update[iv.phone] = phone;
   if(iv["group"] !== undefined) update[iv["group"]] = group;
   else if(iv["groupe"] !== undefined) update[iv["groupe"]] = group;

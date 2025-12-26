@@ -336,9 +336,9 @@ function render(volunteers, todayISO) {
 
     const grp = normGroup(v.group || v.groupe || "");
 
-    const missingQr = !String(v.badgeCode || "").trim();
+    const missingQr = !String(v.qrCode || "").trim();
     const qrWarn = missingQr
-      ? `<span class="ms-1 text-warning qr-missing-icon" title="هاد المتطوع ماعندوش QR/Code badge — خاصو يتزاد ليه باش يقدر يتسكان.">⚠️</span>`
+      ? `<span class="ms-1 text-warning qr-missing-icon" title="Ce bénévole n'a pas de QR/Code badge. Ajoutez un code pour pouvoir le scanner.">⚠️</span>`
       : ``;
 
     return `

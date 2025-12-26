@@ -47,7 +47,7 @@ function normalizeCode(s){
 function buildIndex(){
   byCode = new Map();
   (volunteers || []).forEach(v => {
-    const code = normalizeCode(v.badgeCode || '');
+    const code = normalizeCode(v.qrCode || '');
     if(code) byCode.set(code, v);
   });
 }
@@ -96,7 +96,12 @@ async function loadVolunteers(){
 
 function setStatus(html, kind){
   if(!scanStatusEl) return;
-  const cls = kind === 'success' ? 'text-success' : (kind === 'warn' ? 'text-warning' : (kind === 'danger' ? 'text-danger' : 'text-muted2'));
+  if(kind === 'warn') kind = 'warning';
+  const cls = kind === 'success'
+    ? 'text-success'
+    : (kind === 'warning'
+        ? 'text-warning'
+        : (kind === 'danger' ? 'text-danger' : 'text-muted2'));
   scanStatusEl.className = `mt-3 small ${cls}`;
   scanStatusEl.innerHTML = html;
 }
@@ -115,7 +120,7 @@ let lastAt = 0;
 
 async function ensureCameras(){
   if(!window.Html5Qrcode){
-    setStatus('Librairie QR introuvable.', 'danger');
+    setStatus('Bibliothèque QR non chargée. Vérifiez le <script> html5-qrcode.min.js.', 'danger');
     return [];
   }
   try{
@@ -123,8 +128,19 @@ async function ensureCameras(){
   }catch(e){
     cameras = [];
   }
+  // Sur certains navigateurs, la liste des caméras est vide tant que la permission n'est pas accordée.
+  if(!cameras.length && navigator.mediaDevices?.getUserMedia){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(t => t.stop());
+      cameras = await Html5Qrcode.getCameras();
+    }catch(e){
+      // ignore
+    }
+  }
   return cameras;
 }
+
 
 function pickCameraId(){
   if(cameras?.length){
@@ -139,7 +155,7 @@ async function startScan(){
 
   const cams = await ensureCameras();
   if(!cams.length && location.protocol !== 'https:' && location.hostname !== 'localhost'){
-    setStatus('HTTPS مطلوب باش تخدم الكاميرا. جرّب HTTPS ولا localhost.', 'warn');
+    setStatus('La caméra nécessite HTTPS (ou localhost) et une autorisation.', 'warning');
   }
 
   if(!html5QrCode){
@@ -147,7 +163,7 @@ async function startScan(){
   }
 
   const camera = pickCameraId();
-  setStatus('📷 كنوجدو الكاميرا...', '');
+  setStatus('📷 Préparation de la caméra...', '');
   toggleScanBtn.textContent = '⏸️ Pause';
 
   try{
@@ -163,11 +179,11 @@ async function startScan(){
       () => {}
     );
     scanning = true;
-    setStatus('✅ سكَان خدام… دير QR قدّام الكاميرا.', 'success');
+    setStatus('✅ Scanner prêt… présentez le QR devant la caméra.', 'success');
   }catch(e){
     scanning = false;
     toggleScanBtn.textContent = '▶️ Démarrer';
-    setStatus('ما قدرناش نشغلو الكاميرا. عطِ Permission ولا جرّب Fallback اليدوي.', 'danger');
+    setStatus('Impossible de démarrer la caméra. Autorisez l’accès à la caméra, puis réessayez (ou utilisez le fallback manuel).', 'danger');
   }
 }
 
@@ -186,11 +202,11 @@ async function stopScan(){
 async function switchCamera(){
   await ensureCameras();
   if(!cameras.length){
-    toast('ما لقيتش كاميرات.');
+    toast('Aucune caméra détectée.');
     return;
   }
   camIndex = (camIndex + 1) % cameras.length;
-  toast('🔄 تبدلات الكاميرا');
+  toast('Caméra changée.');
   if(scanning){
     await stopScan();
     await startScan();
@@ -212,23 +228,23 @@ async function processCode(rawCode, source='scan'){
   setLast(`${rawCode}`);
 
   if(!v){
-    setStatus(`❌ الكود <code>${escapeHtml(rawCode)}</code> ما كاينش فـ Volunteers.`, 'danger');
+    setStatus(`❌ Le code <code>${escapeHtml(rawCode)}</code> n'existe pas dans la liste des bénévoles.`, 'danger');
     toast('Code introuvable');
     return;
   }
 
   const today = isoDate(new Date());
-  setStatus(`⏳ كنحاولو نـPointi: <b>${escapeHtml(v.fullName||'')}</b>…`, '');
+  setStatus(`⏳ Pointage en cours : <b>${escapeHtml(v.fullName||'')}</b>…`, '');
 
   try{
     const res = await apiPunch(v.id, today);
     if(res?.ok){
-      setStatus(`✅ تْپونطا مزيان: <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
+      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
       toast('✅ Pointage enregistré');
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
-      setStatus(`⚠️ <b>${escapeHtml(v.fullName||'')}</b> ديجا تْپونطا اليوم (${escapeHtml(today)}).`, 'warn');
+      setStatus(`⚠️ <b>${escapeHtml(v.fullName||'')}</b> est déjà pointé aujourd’hui (${escapeHtml(today)}).`, 'warning');
       toast('Déjà pointé');
       return;
     }
@@ -269,7 +285,7 @@ switchCamBtn?.addEventListener('click', switchCamera);
 
 manualSubmitBtn?.addEventListener('click', async ()=>{
   const code = (manualCodeEl.value || '').trim();
-  if(!code){ toast('دخل الكود'); return; }
+  if(!code){ toast('Veuillez saisir un code.'); return; }
   await processCode(code, 'manual');
   manualCodeEl.select();
 });
@@ -286,5 +302,5 @@ if(window.isSecureContext){
   // small delay so UI paints
   setTimeout(()=> startScan(), 200);
 }else{
-  setStatus('Clique sur “Démarrer”. (Astuce: HTTPS كيعطي permissions ديال الكاميرا)', 'warn');
+  setStatus('Cliquez sur “Démarrer”. (Astuce : HTTPS permet l’accès à la caméra)', 'warning');
 }

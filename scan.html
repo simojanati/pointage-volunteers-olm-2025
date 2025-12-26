@@ -38,7 +38,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <h2 class="h5 mb-1 text-white">Scanner le QR / code badge</h2>
-            <div class="text-muted2 small">Scan dghya باش تـPointi المتطوعين بلا ما تبقا تقلب فاللائحة.</div>
+            <div class="text-muted2 small">Scannez rapidement pour pointer les bénévoles sans chercher dans la liste.</div>
           </div>
           <div class="d-flex align-items-center gap-2">
             <button id="toggleScanBtn" class="btn btn-primary btn-sm">▶️ Démarrer</button>
@@ -53,25 +53,25 @@
             </div>
             <div id="scanStatus" class="mt-3 small"></div>
             <div class="text-muted2 small mt-2">
-              ⚠️ الكاميرا خاصها HTTPS (ولا localhost) و permission.
+              ⚠️ La caméra nécessite HTTPS (ou localhost) et une autorisation.
             </div>
           </div>
 
           <div class="col-12 col-lg-5">
             <div class="p-3 rounded-4 border border-light border-opacity-10" style="background:rgba(0,0,0,.18)">
-              <div class="fw-bold mb-2">Fallback (يدوي)</div>
-              <div class="text-muted2 small mb-2">إلى ما خداماش الكاميرا، لسّق/كتب الكود هنا:</div>
+              <div class="fw-bold mb-2">Fallback (manuel)</div>
+              <div class="text-muted2 small mb-2">Si la caméra ne fonctionne pas, collez/saisissez le code ici :</div>
               <div class="input-group">
                 <input id="manualCode" class="form-control bg-dark text-white border-0" placeholder="Ex: 00034500-1" />
                 <button id="manualSubmit" class="btn btn-outline-light">Valider</button>
               </div>
               <div class="text-muted2 small mt-3">
-                نصيحة: منين كتسكان، خرج QR من الكادر شوية باش ما يرجعش يتقرا نفس الكود بزاف.
+                Astuce : après un scan, éloignez le QR du cadre pour éviter la relecture du même code.
               </div>
             </div>
 
             <div class="mt-3 p-3 rounded-4 border border-light border-opacity-10" style="background:rgba(0,0,0,.18)">
-              <div class="fw-bold mb-2">آخر Scan</div>
+              <div class="fw-bold mb-2">Dernier scan</div>
               <div id="lastScan" class="small text-muted2">—</div>
             </div>
           </div>
@@ -91,7 +91,7 @@
   <script src="./assets/auth.js"></script>
 
   <!-- QR Scanner lib -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="./assets/scan.js"></script>
 </body>
 
