@@ -81,6 +81,9 @@ if (editModalEl && window.bootstrap?.Modal) {
     histMsg.textContent = '';
     histMsg.className = 'small mt-3';
     histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Chargement…</td></tr>';
+    setBtnLoading(submitBtn, true, "Enregistrement...");
+    setInlineSpinner(addSpinnerEl, true);
+
     try{
       const res = await apiVolunteerHistory(currentHistVolunteer.id, from, to);
       if(!res.ok){
@@ -120,6 +123,8 @@ const editFullNameEl = document.getElementById("editFullName");
 const editBadgeCodeEl = document.getElementById("editBadgeCode");
 const editPhoneEl = document.getElementById("editPhone");
 const addMsg = document.getElementById("addMsg");
+const addSpinnerEl = document.getElementById("addSpinner");
+const editSpinnerEl = document.getElementById("editSpinner");
 const fullNameEl = document.getElementById("fullName");
 const badgeCodeEl = document.getElementById("badgeCode");
 const phoneEl = document.getElementById("phone");
@@ -172,6 +177,13 @@ function setBtnLoading(btn, loading, label){
       delete btn.dataset._oldHtml;
     }
   }
+}
+
+
+
+function setInlineSpinner(el, show){
+  if(!el) return;
+  el.classList.toggle("d-none", !show);
 }
 
 
@@ -561,6 +573,9 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
     e.preventDefault();
     addMsg.textContent = "";
     addMsg.className = "small";
+    const submitBtn = addForm.querySelector('button[type="submit"]');
+    resetBtn(submitBtn, "Enregistrer");
+    setInlineSpinner(addSpinnerEl, false);
 
     const fullName = (fullNameEl.value || "").trim();
     const badgeCode = (badgeCodeEl.value || "").trim();
@@ -568,10 +583,15 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
     const group = getSelectedGroupAdd();
     if(groupEl) groupEl.value = group;
     if(!fullName){
+      setInlineSpinner(addSpinnerEl, false);
+      setBtnLoading(submitBtn, false);
       addMsg.textContent = "Le nom complet est obligatoire.";
       addMsg.className = "small text-danger";
       return;
     }
+
+    setBtnLoading(submitBtn, true, "Enregistrement...");
+    setInlineSpinner(addSpinnerEl, true);
 
     try{
       const res = await apiAddVolunteer(fullName, badgeCode, phone, group);
@@ -579,6 +599,7 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
         addMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
           ? "Ce code badge existe déjà."
           : ("Erreur: " + (res.error || "UNKNOWN"));
+        setInlineSpinner(addSpinnerEl, false);
         addMsg.className = "small text-danger";
         return;
       }
@@ -594,6 +615,7 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
 
       addMsg.textContent = "✅ Volontaire ajouté";
       addMsg.className = "small text-success";
+      setInlineSpinner(addSpinnerEl, false);
       fullNameEl.value = "";
       badgeCodeEl.value = "";
       phoneEl.value = "";
@@ -603,9 +625,11 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
 
     }catch(err){
       console.error(err);
+      setInlineSpinner(addSpinnerEl, false);
       addMsg.textContent = "Erreur API (Apps Script).";
       addMsg.className = "small text-danger";
     }finally{
+      setInlineSpinner(addSpinnerEl, false);
       setBtnLoading(submitBtn, false);
     }
   });
@@ -635,12 +659,15 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
 
     setBtnLoading(submitBtn, true, "Mise à jour...");
 
+    setInlineSpinner(editSpinnerEl, true);
+
     try{
       const res = await apiUpdateVolunteer(id, fullName, badgeCode, phone, group);
       if(!res.ok){
         editMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
           ? "Ce code badge existe déjà."
           : ("Erreur: " + (res.error || "UNKNOWN"));
+        setInlineSpinner(editSpinnerEl, false);
         editMsg.className = "small text-danger";
         return;
       }
@@ -657,6 +684,7 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
 
       editMsg.textContent = "✅ Mise à jour effectuée";
       editMsg.className = "small text-success";
+      setInlineSpinner(editSpinnerEl, false);
 
       // re-render after refresh punches (to ensure status ok)
       await load(false, false);
@@ -666,9 +694,11 @@ clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; load(false, f
 
     }catch(err){
       console.error(err);
+      setInlineSpinner(editSpinnerEl, false);
       editMsg.textContent = "Erreur API (Apps Script).";
       editMsg.className = "small text-danger";
     }finally{
+      setInlineSpinner(editSpinnerEl, false);
       // Always restore button state
       setBtnLoading(submitBtn, false);
     }

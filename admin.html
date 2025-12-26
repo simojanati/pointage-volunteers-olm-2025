@@ -7,8 +7,11 @@
   <title>Pointage - Tableau de bord</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="./assets/styles.css" />
-  <link rel="icon" href="./assets/favicon.ico" sizes="any">
-  <link rel="manifest" href="./assets/site.webmanifest">
+  <link rel="icon" href="./assets/icon/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/icon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/icon/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="./assets/icon/apple-touch-icon.png">
+  <link rel="manifest" href="./assets/icon/site.webmanifest">
   <meta name="theme-color" content="#c8102e">
 </head>
 
@@ -60,7 +63,8 @@
           <div class="col-3 col-md-2 d-grid">
             <button id="clearSearchBtn" class="btn btn-outline-light" type="button" aria-label="Effacer la recherche">
               <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.646 2.646a.5.5 0 0 1 .708 0L8 7.293l4.646-4.647a.5.5 0 0 1 .708.708L8.707 8l4.647 4.646a.5.5 0 0 1-.708.708L8 8.707l-4.646 4.647a.5.5 0 0 1-.708-.708L7.293 8 2.646 3.354a.5.5 0 0 1 0-.708z"/>
+                <path
+                  d="M2.646 2.646a.5.5 0 0 1 .708 0L8 7.293l4.646-4.647a.5.5 0 0 1 .708.708L8.707 8l4.647 4.646a.5.5 0 0 1-.708.708L8 8.707l-4.646 4.647a.5.5 0 0 1-.708-.708L7.293 8 2.646 3.354a.5.5 0 0 1 0-.708z" />
               </svg>
             </button>
           </div>
@@ -70,7 +74,7 @@
           </div>
         </div>
 
-<div id="list" class="vstack gap-2 mt-3"></div>
+        <div id="list" class="vstack gap-2 mt-3"></div>
 
         <div id="toast"
           class="position-fixed bottom-0 start-50 translate-middle-x mb-3 px-3 py-2 rounded-pill bg-dark border border-light-subtle small text-white"
@@ -80,7 +84,7 @@
   </main>
 
 
-  
+
   <!-- Historique Modal (SUPER ADMIN) -->
   <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -122,7 +126,9 @@
                 </tr>
               </thead>
               <tbody id="histTbody">
-                <tr><td colspan="4" class="text-muted2 small">Aucun chargement.</td></tr>
+                <tr>
+                  <td colspan="4" class="text-muted2 small">Aucun chargement.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -133,7 +139,7 @@
       </div>
     </div>
   </div>
-<!-- Global Loader -->
+  <!-- Global Loader -->
   <div id="pageLoader" class="page-loader" aria-hidden="true">
     <div class="loader-card">
       <div class="spinner-border" role="status" aria-label="Chargement"></div>
@@ -169,27 +175,31 @@
             </div>
             <div>
               <label class="form-label small text-muted2 mb-1">Groupe</label>
-              
-<div class="d-flex gap-3 mt-1">
-  <label class="form-check text-white">
-    <input class="form-check-input" type="radio" name="groupAdd" id="groupAddA" value="A" checked>
-    <span class="form-check-label">A</span>
-  </label>
-  <label class="form-check text-white">
-    <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
-    <span class="form-check-label">B</span>
-  </label>
-</div>
-<input type="hidden" id="group" value="A">
-</div>
-            </div>
 
-            <button class="btn btn-primary mt-2" type="submit">Enregistrer</button>
-            <div id="addMsg" class="small"></div>
-          </form>
+              <div class="d-flex gap-3 mt-1">
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupAdd" id="groupAddA" value="A" checked>
+                  <span class="form-check-label">A</span>
+                </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
+                  <span class="form-check-label">B</span>
+                </label>
+              </div>
+              <input type="hidden" id="group" value="A">
+            </div>
         </div>
+
+        <button id="addSubmitBtn" class="btn btn-primary mt-2" type="submit">Enregistrer</button>
+        <div id="addSpinner" class="mt-2 d-none" aria-live="polite">
+          <span class="spinner-border spinner-border-sm text-light me-2" role="status" aria-hidden="true"></span>
+          <span class="small text-muted2">Enregistrement...</span>
+        </div>
+        <div id="addMsg" class="small"></div>
+        </form>
       </div>
     </div>
+  </div>
   </div>
 
 
@@ -222,27 +232,31 @@
             </div>
             <div>
               <label class="form-label small text-muted2 mb-1">Groupe</label>
-              
-<div class="d-flex gap-3 mt-1">
-  <label class="form-check text-white">
-    <input class="form-check-input" type="radio" name="groupEdit" id="groupEditA" value="A" checked>
-    <span class="form-check-label">A</span>
-  </label>
-  <label class="form-check text-white">
-    <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
-    <span class="form-check-label">B</span>
-  </label>
-</div>
-<input type="hidden" id="editGroup" value="A">
-</div>
-            </div>
 
-            <button class="btn btn-primary mt-2" type="submit">Mettre à jour</button>
-            <div id="editMsg" class="small"></div>
-          </form>
+              <div class="d-flex gap-3 mt-1">
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupEdit" id="groupEditA" value="A" checked>
+                  <span class="form-check-label">A</span>
+                </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
+                  <span class="form-check-label">B</span>
+                </label>
+              </div>
+              <input type="hidden" id="editGroup" value="A">
+            </div>
         </div>
+
+        <button id="editSubmitBtn" class="btn btn-primary mt-2" type="submit">Mettre à jour</button>
+        <div id="editSpinner" class="mt-2 d-none" aria-live="polite">
+          <span class="spinner-border spinner-border-sm text-light me-2" role="status" aria-hidden="true"></span>
+          <span class="small text-muted2">Mise à jour...</span>
+        </div>
+        <div id="editMsg" class="small"></div>
+        </form>
       </div>
     </div>
+  </div>
   </div>
 
   <datalist id="groupDatalist"></datalist>
