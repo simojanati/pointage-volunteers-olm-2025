@@ -49,10 +49,16 @@ async function apiReportPunches(fromISO, toISO) {
   return jsonpRequest({ action:"reportPunches", from: fromISO, to: toISO });
 }
 
-function isoDate(d){ return d.toISOString().slice(0,10); }
+// Local YYYY-MM-DD (avoid UTC shift from toISOString)
+function isoDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + da;
+}
 
-async function apiAddVolunteer(fullName, badgeCode="", phone="", group="") {
-  return jsonpRequest({ action:"addVolunteer", fullName, badgeCode, phone, group });
+async function apiAddVolunteer(fullName, badgeCode="", qrCode="", phone="", group="") {
+  return jsonpRequest({ action:"addVolunteer", fullName, badgeCode, qrCode, phone, group });
 }
 
 async function apiDeletePunch(volunteerId, dateISO) {
@@ -60,8 +66,8 @@ async function apiDeletePunch(volunteerId, dateISO) {
 }
 
 
-async function apiUpdateVolunteer(id, fullName, badgeCode="", phone="", group="") {
-  return jsonpRequest({ action:"updateVolunteer", id: String(id), fullName, badgeCode, phone, group });
+async function apiUpdateVolunteer(id, fullName, badgeCode="", qrCode="", phone="", group="") {
+  return jsonpRequest({ action:"updateVolunteer", id: String(id), fullName, badgeCode, qrCode, phone, group });
 }
 
 

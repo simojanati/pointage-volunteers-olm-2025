@@ -128,12 +128,14 @@ const editMsg = document.getElementById("editMsg");
 const editIdEl = document.getElementById("editId");
 const editFullNameEl = document.getElementById("editFullName");
 const editBadgeCodeEl = document.getElementById("editBadgeCode");
+const editQrCodeEl = document.getElementById("editQrCode");
 const editPhoneEl = document.getElementById("editPhone");
 const addMsg = document.getElementById("addMsg");
 const addSpinnerEl = document.getElementById("addSpinner");
 const editSpinnerEl = document.getElementById("editSpinner");
 const fullNameEl = document.getElementById("fullName");
 const badgeCodeEl = document.getElementById("badgeCode");
+const qrCodeEl = document.getElementById("qrCode");
 const phoneEl = document.getElementById("phone");
 const groupEl = document.getElementById("group");
 const editGroupEl = document.getElementById("editGroup");
@@ -199,6 +201,16 @@ function setInlineSpinner(el, show){
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s]));
+}
+
+// Local time display (avoid 1h shift when API returns ISO in UTC)
+function formatTimeLocal(iso){
+  if(!iso) return "";
+  try{
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+  }catch(e){
+    return String(iso).slice(11,16);
+  }
 }
 
 // Normalize for search (fix "parfois filtre makayfiltrich")
@@ -331,7 +343,7 @@ function render(volunteers, todayISO) {
       : ``;
 
     const timeBadge = punchedToday
-      ? `<span class="badge badge-soft text-white">⏱ ${(punchedAt || "").slice(11,16)}</span>`
+      ? `<span class="badge badge-soft text-white">⏱ ${formatTimeLocal(punchedAt)}</span>`
       : "";
 
     const grp = normGroup(v.group || v.groupe || "");
@@ -516,6 +528,7 @@ scanBtn?.addEventListener("click", () => { location.href = "./scan.html"; });
         editIdEl.value = String(v.id);
         editFullNameEl.value = v.fullName || "";
         editBadgeCodeEl.value = v.badgeCode || "";
+        if(editQrCodeEl) editQrCodeEl.value = v.qrCode || "";
         editPhoneEl.value = v.phone || "";
         setGroupRadios("groupEdit", v.group || "A");
         editModal?.show();
@@ -548,6 +561,7 @@ logoutBtn?.addEventListener("click", logout);
     addMsg.textContent = "";
     addMsg.className = "small";
     setGroupRadios("groupAdd", "A");
+    if(qrCodeEl) qrCodeEl.value = "";
     addModal?.show();
   });
 
@@ -561,6 +575,7 @@ logoutBtn?.addEventListener("click", logout);
 
     const fullName = (fullNameEl.value || "").trim();
     const badgeCode = (badgeCodeEl.value || "").trim();
+    const qrCode = (qrCodeEl ? (qrCodeEl.value || "") : "").trim();
     const phone = (phoneEl.value || "").trim();
     const group = getSelectedGroupAdd();
     if(groupEl) groupEl.value = group;
@@ -576,11 +591,13 @@ logoutBtn?.addEventListener("click", logout);
     setInlineSpinner(addSpinnerEl, true);
 
     try{
-      const res = await apiAddVolunteer(fullName, badgeCode, phone, group);
+      const res = await apiAddVolunteer(fullName, badgeCode, qrCode, phone, group);
       if(!res.ok){
         addMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
           ? "Ce code badge existe déjà."
-          : ("Erreur: " + (res.error || "UNKNOWN"));
+          : (res.error === "QR_ALREADY_EXISTS"
+            ? "Ce code QR existe déjà."
+            : ("Erreur: " + (res.error || "UNKNOWN")));
         setInlineSpinner(addSpinnerEl, false);
         addMsg.className = "small text-danger";
         return;
@@ -590,6 +607,7 @@ logoutBtn?.addEventListener("click", logout);
         id: res.id,
         fullName,
         badgeCode,
+        qrCode,
         phone,
         group
       });
@@ -600,6 +618,7 @@ logoutBtn?.addEventListener("click", logout);
       setInlineSpinner(addSpinnerEl, false);
       fullNameEl.value = "";
       badgeCodeEl.value = "";
+      if(qrCodeEl) qrCodeEl.value = "";
       phoneEl.value = "";
 
       setTimeout(()=> addModal?.hide(), 500);
@@ -625,6 +644,7 @@ logoutBtn?.addEventListener("click", logout);
     const id = (editIdEl.value || "").trim();
     const fullName = (editFullNameEl.value || "").trim();
     const badgeCode = (editBadgeCodeEl.value || "").trim();
+    const qrCode = (editQrCodeEl ? (editQrCodeEl.value || "") : "").trim();
     const phone = (editPhoneEl.value || "").trim();
     const group = getSelectedGroupEdit();
     if(editGroupEl) editGroupEl.value = group;
@@ -644,11 +664,13 @@ logoutBtn?.addEventListener("click", logout);
     setInlineSpinner(editSpinnerEl, true);
 
     try{
-      const res = await apiUpdateVolunteer(id, fullName, badgeCode, phone, group);
+      const res = await apiUpdateVolunteer(id, fullName, badgeCode, qrCode, phone, group);
       if(!res.ok){
         editMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
           ? "Ce code badge existe déjà."
-          : ("Erreur: " + (res.error || "UNKNOWN"));
+          : (res.error === "QR_ALREADY_EXISTS"
+            ? "Ce code QR existe déjà."
+            : ("Erreur: " + (res.error || "UNKNOWN")));
         setInlineSpinner(editSpinnerEl, false);
         editMsg.className = "small text-danger";
         return;
@@ -659,6 +681,7 @@ logoutBtn?.addEventListener("click", logout);
       if(v){
         v.fullName = fullName;
         v.badgeCode = badgeCode;
+        v.qrCode = qrCode;
         v.phone = phone;
           v.group = group;
       }

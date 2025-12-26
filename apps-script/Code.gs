@@ -264,11 +264,15 @@ function punch(p){
   const group = pickGroup(iv, vrow);
 
   const rows = hp.values.slice(1);
-  const already = rows.some(r =>
-    String(r[ip.volunteer_id]) === volunteerId &&
-    toYMD(r[ip.punch_date]) === date
-  );
-  if(already) return { ok:false, error:"ALREADY_PUNCHED" };
+  let existingTs = null;
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i];
+    if(String(r[ip.volunteer_id]) === volunteerId && toYMD(r[ip.punch_date]) === date){
+      existingTs = r[ip.punched_at];
+      break;
+    }
+  }
+  if(existingTs) return { ok:false, error:"ALREADY_PUNCHED", punchedAt: toISO(existingTs) };
 
   const now = new Date(); // keep as Date object (sheet TZ)
   const outRow = [];
@@ -363,6 +367,7 @@ function updateVolunteer(p){
   const id = String(p.id || "").trim();
   const fullName = String(p.fullName || "").trim();
   const badgeCode = String(p.badgeCode || "").trim();
+  const qrCode = String(p.qrCode || "").trim();
   const phone = String(p.phone || "").trim();
   const group = String(p.group || "").trim();
   if(!id || !fullName) return { ok:false, error:"MISSING_PARAMS" };

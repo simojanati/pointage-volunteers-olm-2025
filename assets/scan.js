@@ -44,6 +44,17 @@ function normalizeCode(s){
   return String(s || '').trim().toLowerCase().replace(/\s+/g, '');
 }
 
+
+function formatTimeLocal(iso){
+  if(!iso) return "";
+  try{
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+  }catch(e){
+    return String(iso).slice(11,16);
+  }
+}
+
+
 function buildIndex(){
   byCode = new Map();
   (volunteers || []).forEach(v => {
@@ -96,18 +107,17 @@ async function loadVolunteers(){
 
 function setStatus(html, kind){
   if(!scanStatusEl) return;
-  if(kind === 'warn') kind = 'warning';
-  const cls = kind === 'success'
+  // Requested UX: only two colors (green/red)
+  const cls = (kind === 'success' || kind === 'ok' || kind === 'info' || kind === '')
     ? 'text-success'
-    : (kind === 'warning'
-        ? 'text-warning'
-        : (kind === 'danger' ? 'text-danger' : 'text-muted2'));
+    : 'text-danger';
   scanStatusEl.className = `mt-3 small ${cls}`;
   scanStatusEl.innerHTML = html;
 }
 
-function setLast(text){
-  if(lastScanEl) lastScanEl.textContent = text || '—';
+function setLast(html){
+  if(!lastScanEl) return;
+  lastScanEl.innerHTML = html || '—';
 }
 
 let html5QrCode = null;
@@ -177,7 +187,7 @@ async function startScan(){
     camIndex = pickRearCameraIndex(cams);
   }
   if(!cams.length && location.protocol !== 'https:' && location.hostname !== 'localhost'){
-    setStatus('La caméra nécessite HTTPS (ou localhost) et une autorisation.', 'warning');
+    setStatus('La caméra nécessite HTTPS (ou localhost) et une autorisation.', 'danger');
   }
 
   if(!html5QrCode){
@@ -260,13 +270,15 @@ async function processCode(rawCode, source='scan'){
 
   await loadVolunteers();
   const v = byCode.get(code);
-  setLast(`${rawCode}`);
 
   if(!v){
+    setLast(`<span class="fw-semibold">Code :</span> <code>${escapeHtml(rawCode)}</code>`);
     setStatus(`❌ Le code <code>${escapeHtml(rawCode)}</code> n'existe pas dans la liste des bénévoles.`, 'danger');
     toast('Code introuvable');
     return;
   }
+
+  setLast(`<span class="fw-semibold">${escapeHtml(v.fullName||'')}</span> <span class="opacity-75">—</span> <code>${escapeHtml(rawCode)}</code>`);
 
   const today = isoDate(new Date());
   setStatus(`⏳ Pointage en cours : <b>${escapeHtml(v.fullName||'')}</b>…`, '');
@@ -279,7 +291,9 @@ async function processCode(rawCode, source='scan'){
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
-      setStatus(`⚠️ <b>${escapeHtml(v.fullName||'')}</b> est déjà pointé aujourd’hui (${escapeHtml(today)}).`, 'warning');
+      const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
+      const at = t ? ` à <b>${escapeHtml(t)}</b>` : '';
+      setStatus(`❌ <b>${escapeHtml(v.fullName||'')}</b> est déjà pointé aujourd’hui${at}.`, 'danger');
       toast('Déjà pointé');
       return;
     }
@@ -337,5 +351,5 @@ if(window.isSecureContext){
   // small delay so UI paints
   setTimeout(()=> startScan(), 200);
 }else{
-  setStatus('Cliquez sur “Démarrer”. (Astuce : HTTPS permet l’accès à la caméra)', 'warning');
+  setStatus('Cliquez sur “Démarrer”. (Astuce : HTTPS permet l’accès à la caméra)', 'ok');
 }
