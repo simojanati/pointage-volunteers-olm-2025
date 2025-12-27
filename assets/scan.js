@@ -10,6 +10,250 @@ const switchCamBtn = document.getElementById('switchCamBtn');
 const manualCodeEl = document.getElementById('manualCode');
 const manualSubmitBtn = document.getElementById('manualSubmit');
 
+
+// Assign QR -> Volunteer modal
+const assignModalEl = document.getElementById('assignQrModal');
+const assignQrCodeEl = document.getElementById('assignQrCode');
+const assignSearchEl = document.getElementById('assignSearch');
+const assignListEl = document.getElementById('assignList');
+const assignInfoEl = document.getElementById('assignInfo');
+const copyQrBtn = document.getElementById('copyQrBtn');
+
+let assignModal = null;
+let pendingAssignCode = '';
+let assignIndex = [];
+let holdScan = false; // when modal is open, keep scanner paused
+
+function normSearch(s){
+  let x = String(s || '').toLowerCase().trim();
+  try{ x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }catch(e){}
+  return x;
+}
+
+async function copyToClipboard(text){
+  const t = String(text || '');
+  if(!t) return false;
+  try{
+    await navigator.clipboard.writeText(t);
+    return true;
+  }catch(e){
+    // fallback: hidden textarea
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }catch(e2){
+      return false;
+    }
+  }
+}
+
+function ensureAssignModal(){
+  if(!assignModalEl || !window.bootstrap) return null;
+  if(!assignModal) assignModal = new bootstrap.Modal(assignModalEl, { backdrop: 'static' });
+  return assignModal;
+}
+
+function buildAssignIndex(){
+  assignIndex = (volunteers || []).map(v => {
+    const key = normSearch(`${v.fullName || ''} ${v.badgeCode || ''}`);
+    return { v, key };
+  });
+}
+
+function renderAssignResults(query=''){
+  if(!assignListEl) return;
+  const q = normSearch(query);
+  let items = assignIndex;
+  if(q){
+    items = assignIndex.filter(it => it.key.includes(q));
+  }
+  const total = items.length;
+  items = items.slice(0, 80);
+
+  if(assignInfoEl){
+    assignInfoEl.className = 'small text-muted2';
+    assignInfoEl.textContent = total ? `${Math.min(80,total)} résultat(s) affiché(s) sur ${total}.` : 'Aucun résultat.';
+  }
+
+  assignListEl.innerHTML = items.map(({v}) => {
+    const name = escapeHtml(v.fullName || '—');
+    const badge = escapeHtml(v.badgeCode || '');
+    const id = escapeHtml(v.id || '');
+    return `
+      <div class="list-group-item bg-transparent text-white border border-light border-opacity-10 rounded-3 mb-2">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <div>
+            <div class="fw-semibold">${name}</div>
+            <div class="small text-muted2">Badge: <code>${badge || '—'}</code></div>
+          </div>
+          <button class="btn btn-sm btn-primary" data-assign-id="${id}">Associer</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // bind events
+  assignListEl.querySelectorAll('[data-assign-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-assign-id');
+      if(!id) return;
+      await assignQrToVolunteer(id);
+    });
+  });
+}
+
+async function punchVolunteerAfterAssign(v, rawCode){
+  const today = isoDate(new Date());
+  setLast(`<span class="fw-semibold">${escapeHtml(v.fullName||'')}</span> <span class="opacity-75">—</span> <code>${escapeHtml(rawCode)}</code>`);
+  setStatus(`⏳ Pointage en cours : <b>${escapeHtml(v.fullName||'')}</b>…`, 'ok');
+
+  try{
+    const res = await apiPunch(v.id, today);
+    if(res?.ok){
+      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
+      toast('✅ Pointage enregistré');
+      return;
+    }
+    if(res?.error === 'ALREADY_PUNCHED'){
+      const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
+      const at = t ? ` à <b>${escapeHtml(t)}</b>` : '';
+      setStatus(`❌ <b>${escapeHtml(v.fullName||'')}</b> est déjà pointé aujourd’hui${at}.`, 'danger');
+      toast('Déjà pointé');
+      return;
+    }
+    if(res?.error === 'NOT_AUTHENTICATED'){
+      logout();
+      return;
+    }
+    setStatus(`❌ Erreur: ${escapeHtml(res?.error || 'UNKNOWN')}`, 'danger');
+    toast('Erreur');
+  }catch(e){
+    setStatus('❌ Erreur API (Apps Script).', 'danger');
+    toast('Erreur API');
+  }
+}
+
+async function assignQrToVolunteer(volunteerId){
+  const code = String(pendingAssignCode || '').trim();
+  if(!code){ toast('Code manquant'); return; }
+
+  // find volunteer from current list
+  const v = (volunteers || []).find(x => String(x.id) === String(volunteerId));
+  if(!v){
+    toast('Bénévole introuvable');
+    return;
+  }
+
+  // disable buttons while updating
+  assignListEl?.querySelectorAll('button').forEach(b => b.disabled = true);
+  if(assignInfoEl){
+    assignInfoEl.className = 'small';
+    assignInfoEl.innerHTML = '⏳ Association en cours…';
+  }
+
+  try{
+    const res = await apiUpdateVolunteer(v.id, v.fullName || '', v.badgeCode || '', code, v.phone || '', v.group || '');
+    if(res?.ok){
+      // update local model + cache
+      v.qrCode = code;
+      writeLocal(volunteers);
+      buildIndex();
+      buildAssignIndex();
+
+      if(assignInfoEl){
+        assignInfoEl.className = 'small text-success';
+        assignInfoEl.textContent = '✅ Code QR associé. Pointage en cours…';
+      }
+
+      // close modal then punch
+      try{
+        const m = ensureAssignModal();
+        m?.hide();
+      }catch(e){}
+
+      holdScan = false;
+      // allow scanning again
+      try{ html5QrCode?.resume(); }catch(e){}
+
+      // avoid anti-bounce blocking the same code
+      lastCode = '';
+      lastAt = 0;
+
+      await punchVolunteerAfterAssign(v, code);
+      return;
+    }
+    if(res?.error === 'QR_ALREADY_EXISTS'){
+      if(assignInfoEl){
+        assignInfoEl.className = 'small text-danger';
+        assignInfoEl.textContent = '❌ Ce code QR est déjà utilisé par un autre bénévole.';
+      }
+      toast('Code QR déjà utilisé');
+    }else if(res?.error === 'NOT_AUTHENTICATED'){
+      logout();
+      return;
+    }else{
+      if(assignInfoEl){
+        assignInfoEl.className = 'small text-danger';
+        assignInfoEl.textContent = `❌ Erreur: ${res?.error || 'UNKNOWN'}`;
+      }
+      toast('Erreur');
+    }
+  }catch(e){
+    if(assignInfoEl){
+      assignInfoEl.className = 'small text-danger';
+      assignInfoEl.textContent = '❌ Erreur API (Apps Script).';
+    }
+    toast('Erreur API');
+  } finally {
+    // re-enable buttons
+    assignListEl?.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+}
+
+function openAssignModal(rawCode){
+  pendingAssignCode = String(rawCode || '').trim();
+  if(assignQrCodeEl) assignQrCodeEl.textContent = pendingAssignCode || '—';
+
+  // copy automatically
+  copyToClipboard(pendingAssignCode).then(ok => {
+    if(ok) toast('Code copié');
+  });
+
+  buildAssignIndex();
+  if(assignSearchEl) assignSearchEl.value = '';
+  renderAssignResults('');
+
+  holdScan = true;
+  try{ html5QrCode?.pause(true); }catch(e){}
+
+  const m = ensureAssignModal();
+  m?.show();
+  setTimeout(()=> assignSearchEl?.focus(), 150);
+}
+
+assignSearchEl?.addEventListener('input', (e)=>{
+  renderAssignResults(e.target.value || '');
+});
+
+copyQrBtn?.addEventListener('click', async ()=>{
+  const ok = await copyToClipboard(pendingAssignCode);
+  toast(ok ? 'Copié' : 'Copie impossible');
+});
+
+assignModalEl?.addEventListener('hidden.bs.modal', ()=>{
+  holdScan = false;
+  // resume scan if running
+  try{ html5QrCode?.resume(); }catch(e){}
+});
+
 function toast(msg){
   if(!toastEl) return;
   toastEl.textContent = msg;
@@ -273,8 +517,9 @@ async function processCode(rawCode, source='scan'){
 
   if(!v){
     setLast(`<span class="fw-semibold">Code :</span> <code>${escapeHtml(rawCode)}</code>`);
-    setStatus(`❌ Le code <code>${escapeHtml(rawCode)}</code> n'existe pas dans la liste des bénévoles.`, 'danger');
+    setStatus(`❌ Le code <code>${escapeHtml(rawCode)}</code> est introuvable. Vous pouvez l’associer à un bénévole.`, 'danger');
     toast('Code introuvable');
+    openAssignModal(rawCode);
     return;
   }
 
@@ -320,7 +565,9 @@ function onScanSuccess(decodedText){
     .finally(()=>{
       setTimeout(()=>{
         processing = false;
-        try{ html5QrCode?.resume(); }catch(e){}
+        if(!holdScan){
+          try{ html5QrCode?.resume(); }catch(e){}
+        }
       }, 650);
     });
 }
