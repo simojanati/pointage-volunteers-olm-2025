@@ -198,6 +198,7 @@ code{
 .qr-reader video{ width:100% !important; height:auto !important; border-radius: 18px; }
 .qr-missing-icon{ cursor: help; }
 
+
 /* Responsive navbar (mobile): keep decor + avoid overflow.
    - User pill (username + role) pinned top-right
    - Logo + action buttons remain underneath

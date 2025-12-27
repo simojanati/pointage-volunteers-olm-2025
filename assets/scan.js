@@ -160,7 +160,7 @@ async function assignQrToVolunteer(volunteerId){
   }
 
   try{
-    const res = await apiUpdateVolunteer(v.id, v.fullName || '', v.badgeCode || '', code, v.phone || '', v.group || '');
+        const res = await apiAssignQrCode(v.id, code);
     if(res?.ok){
       // update local model + cache
       v.qrCode = code;

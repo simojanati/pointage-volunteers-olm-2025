@@ -76,6 +76,11 @@ async function apiUpdateVolunteer(id, fullName, badgeCode="", qrCode="", phone="
 }
 
 
+function apiAssignQrCode(volunteerId, qrCode){
+  return jsonpRequest({ action:"assignQrCode", volunteerId: String(volunteerId), qrCode: String(qrCode || "") });
+}
+
+
 async function apiLogin(username, pin){
   return jsonpRequest({ action:"login", username, pin });
 }

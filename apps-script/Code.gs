@@ -132,6 +132,12 @@ function doGet(e){
       return jsonp(deletePunch(p), callback);
     }
 
+    if(action === "assignQrCode"){
+      const auth = requireRole(p, "ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      return jsonp(assignQrCode(p), callback);
+    }
+
     if(action === "punchGroup"){
       const auth = requireRole(p, "SUPER_ADMIN");
       if(!auth.ok) return jsonp(auth, callback);
@@ -547,6 +553,56 @@ function updateVolunteer(p){
   });
 
   return { ok:true };
+}
+
+
+function assignQrCode(p){
+  const volunteerId = String(p.volunteerId || p.id || "").trim();
+  const qrCode = String(p.qrCode || "").trim();
+  if(!volunteerId || !qrCode) return { ok:false, error:"MISSING_PARAMS" };
+
+  const shV = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
+  if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
+  ensureHeader(shV, "qr_code");
+  const h = headerIndex(shV);
+  if(!h.ok) return h;
+
+  const idx = h.idx;
+  if(idx.id === undefined) return { ok:false, error:"ID_COL_NOT_FOUND" };
+  if(idx["qr_code"] === undefined) return { ok:false, error:"QR_COL_NOT_FOUND" };
+
+  // Find target row (sheet row index)
+  let targetRow = -1;
+  for(let i=1;i<h.values.length;i++){
+    const rid = String(h.values[i][idx.id] || "").trim();
+    if(rid === volunteerId){
+      targetRow = i + 1;
+      break;
+    }
+  }
+  if(targetRow < 0) return { ok:false, error:"VOLUNTEER_NOT_FOUND" };
+
+  // Uniqueness check
+  const qn = norm(qrCode);
+  for(let i=1;i<h.values.length;i++){
+    const rid = String(h.values[i][idx.id] || "").trim();
+    const existing = String(h.values[i][idx["qr_code"]] || "").trim();
+    if(existing && norm(existing) === qn && rid !== volunteerId){
+      return { ok:false, error:"QR_ALREADY_EXISTS" };
+    }
+  }
+
+  // Write value
+  shV.getRange(targetRow, idx["qr_code"] + 1).setValue(qrCode);
+
+  // Return updated volunteer (minimal)
+  const row = shV.getRange(targetRow, 1, 1, shV.getLastColumn()).getValues()[0];
+  const fullName = String(row[idx["full_name"]] || "").trim();
+  const badgeCode = String(row[idx["badge_code"]] || "").trim();
+  const phone = (idx.phone !== undefined) ? String(row[idx.phone] || "").trim() : "";
+  const group = pickGroup(idx, row);
+
+  return { ok:true, id: volunteerId, fullName, badgeCode, qrCode, phone, group };
 }
 
 function reportSummary(p){
