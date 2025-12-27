@@ -24,7 +24,10 @@ function toYMD(v){
 }
 
 function toISO(v){
-  if (v instanceof Date) return v.toISOString();
+  // IMPORTANT: avoid UTC shift ("-1h") when displaying times in the UI.
+  // We serialize dates in the spreadsheet timezone WITHOUT the trailing "Z".
+  // Example: 2025-12-27T15:04:00
+  if (v instanceof Date) return Utilities.formatDate(v, sheetTZ(), "yyyy-MM-dd'T'HH:mm:ss");
   return String(v || "").trim();
 }
 
@@ -127,6 +130,12 @@ function doGet(e){
       const auth = requireRole(p, "ADMIN");
       if(!auth.ok) return jsonp(auth, callback);
       return jsonp(deletePunch(p), callback);
+    }
+
+    if(action === "punchGroup"){
+      const auth = requireRole(p, "SUPER_ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      return jsonp(punchGroup(p), callback);
     }
 
     // SUPER ADMIN actions
@@ -288,6 +297,98 @@ function punch(p){
 
   shP.appendRow(outRow);
   return { ok:true };
+}
+
+/**
+ * SUPER_ADMIN: Punch all volunteers for a given group and date.
+ * Params: group (string), date (yyyy-MM-dd)
+ * Returns: ok, totalInGroup, punchedNew, alreadyPunched, date, group
+ */
+function punchGroup(p){
+  const group = String(p.group || "").trim();
+  const date = String(p.date || "").trim();
+  if(!group || !date) return { ok:false, error:"MISSING_PARAMS" };
+
+  const shP = SpreadsheetApp.getActive().getSheetByName(SHEET_PUNCH);
+  const shV = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
+  if(!shP) return { ok:false, error:"PUNCH_SHEET_NOT_FOUND" };
+  if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
+
+  ensureHeader(shP, "group");
+  ensureHeader(shV, "group");
+  const hp = headerIndex(shP);
+  const hv = headerIndex(shV);
+  if(!hp.ok) return hp;
+  if(!hv.ok) return hv;
+
+  const ip = hp.idx;
+  const iv = hv.idx;
+
+  // Build set of already punched volunteerIds for the date
+  const punchedSet = {};
+  hp.values.slice(1).forEach(r => {
+    const d = toYMD(r[ip.punch_date]);
+    if(d === date){
+      punchedSet[String(r[ip.volunteer_id]||"")] = true;
+    }
+  });
+
+  const gNorm = norm(group);
+  const vrows = hv.values.slice(1);
+  const targets = [];
+  vrows.forEach(r => {
+    const id = String(r[iv.id]||"").trim();
+    if(!id) return;
+    const g = pickGroup(iv, r);
+    if(norm(g) !== gNorm) return;
+    targets.push({
+      id,
+      fullName: String(r[iv["full_name"]]||"").trim(),
+      badgeCode: String(r[iv["badge_code"]]||"").trim(),
+      group: g
+    });
+  });
+
+  const totalInGroup = targets.length;
+  if(totalInGroup === 0){
+    return { ok:false, error:"EMPTY_GROUP", group, date };
+  }
+
+  let alreadyPunched = 0;
+  const now = new Date();
+  const rowsToAppend = [];
+
+  targets.forEach(v => {
+    if(punchedSet[String(v.id)]){
+      alreadyPunched++;
+      return;
+    }
+    const outRow = [];
+    hp.header.forEach(hname => {
+      if(hname === "punch_date") outRow.push(date);
+      else if(hname === "volunteer_id") outRow.push(v.id);
+      else if(hname === "punched_at") outRow.push(now);
+      else if(hname === "badge_code") outRow.push(v.badgeCode);
+      else if(hname === "full_name") outRow.push(v.fullName);
+      else if(hname === "group" || hname === "groupe") outRow.push(v.group);
+      else outRow.push("");
+    });
+    rowsToAppend.push(outRow);
+  });
+
+  if(rowsToAppend.length){
+    const startRow = shP.getLastRow() + 1;
+    shP.getRange(startRow, 1, rowsToAppend.length, hp.header.length).setValues(rowsToAppend);
+  }
+
+  return {
+    ok:true,
+    group,
+    date,
+    totalInGroup,
+    alreadyPunched,
+    punchedNew: rowsToAppend.length
+  };
 }
 
 function deletePunch(p){

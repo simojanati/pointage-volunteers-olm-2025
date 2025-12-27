@@ -43,6 +43,7 @@
           <div class="d-flex align-items-center gap-2">
             <span class="badge badge-soft text-white" id="countPill">0</span>
             <button id="scanBtn" class="btn btn-outline-light btn-sm">📷 Scanner</button>
+            <button id="groupPunchBtn" class="btn btn-outline-light btn-sm" data-super-only>👥 Pointage par groupe</button>
             <button id="refreshBtn" class="btn btn-outline-light btn-sm">Actualiser</button>
           </div>
         </div>
@@ -58,6 +59,7 @@
               <option value="">Tous les groupes</option>
               <option value="A">Groupe A</option>
               <option value="B">Groupe B</option>
+              <option value="C">Groupe C</option>
             </select>
           </div>
 
@@ -140,6 +142,32 @@
       </div>
     </div>
   </div>
+
+  <!-- Pointage par groupe Modal (SUPER ADMIN) -->
+  <div class="modal fade" id="groupPunchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-light border-opacity-25">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title mb-0">Pointage par groupe</h5>
+            <div class="small text-muted2">Sélectionnez un groupe puis pointez tous les volontaires du groupe en une seule fois.</div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="small text-muted2 mb-2">Groupe</div>
+          <div id="groupPunchRadios" class="d-flex flex-wrap gap-3"></div>
+
+          <div id="groupPunchHint" class="small text-muted2 mt-3"></div>
+          <div id="groupPunchMsg" class="small mt-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-light" data-bs-dismiss="modal">Annuler</button>
+          <button id="groupPunchDoBtn" class="btn btn-primary">Pointer en masse</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Global Loader -->
   <div id="pageLoader" class="page-loader" aria-hidden="true">
     <div class="loader-card">
@@ -191,8 +219,27 @@
                   <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
                   <span class="form-check-label">B</span>
                 </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupAdd" id="groupAddC" value="C">
+                  <span class="form-check-label">C</span>
+                </label>
               </div>
               <input type="hidden" id="group" value="A">
+            </div>
+
+            <div>
+              <label class="form-label small text-muted2 mb-1">Pointer maintenant&nbsp;?</label>
+              <div class="d-flex gap-3 mt-1">
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="punchNowAdd" id="punchNowNo" value="no" checked>
+                  <span class="form-check-label">Non</span>
+                </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="punchNowAdd" id="punchNowYes" value="yes">
+                  <span class="form-check-label">Oui</span>
+                </label>
+              </div>
+              <div class="form-text text-muted2">Si «&nbsp;Oui&nbsp;», le pointage du jour sera enregistré automatiquement après l'ajout.</div>
             </div>
         </div>
 
@@ -252,6 +299,10 @@
                 <label class="form-check text-white">
                   <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
                   <span class="form-check-label">B</span>
+                </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="groupEdit" id="groupEditC" value="C">
+                  <span class="form-check-label">C</span>
                 </label>
               </div>
               <input type="hidden" id="editGroup" value="A">

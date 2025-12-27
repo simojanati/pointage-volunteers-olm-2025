@@ -41,6 +41,11 @@ async function apiPunch(volunteerId, dateISO) {
   return jsonpRequest({ action:"punch", volunteerId: String(volunteerId), date: dateISO });
 }
 
+// SUPER_ADMIN: punch all volunteers of a group for a date (YYYY-MM-DD)
+async function apiPunchGroup(group, dateISO){
+  return jsonpRequest({ action:"punchGroup", group: String(group||""), date: String(dateISO||"") });
+}
+
 async function apiReportSummary(fromISO, toISO) {
   return jsonpRequest({ action:"reportSummary", from: fromISO, to: toISO });
 }

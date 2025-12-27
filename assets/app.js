@@ -3,6 +3,7 @@ const searchEl = document.getElementById("search");
 const groupFilterEl = document.getElementById("groupFilter");
 const refreshBtn = document.getElementById("refreshBtn");
 const scanBtn = document.getElementById("scanBtn");
+const groupPunchBtn = document.getElementById("groupPunchBtn");
 const countPill = document.getElementById("countPill");
 const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
@@ -60,12 +61,22 @@ const histSubtitle = document.getElementById('histSubtitle');
 let historyModal = null;
 let currentHistVolunteer = null;
 
+// Group punch (SUPER ADMIN)
+const groupPunchModalEl = document.getElementById('groupPunchModal');
+const groupPunchRadiosEl = document.getElementById('groupPunchRadios');
+const groupPunchHintEl = document.getElementById('groupPunchHint');
+const groupPunchMsgEl = document.getElementById('groupPunchMsg');
+const groupPunchDoBtn = document.getElementById('groupPunchDoBtn');
+let groupPunchModal = null;
+let lastGroupPunchSelection = "";
+
 // Edit modal
 const editModalEl = document.getElementById("editModal");
 let editModal;
 if (editModalEl && window.bootstrap?.Modal) {
   editModal = new bootstrap.Modal(editModalEl);
   if(historyModalEl) historyModal = new bootstrap.Modal(historyModalEl);
+  if(groupPunchModalEl) groupPunchModal = new bootstrap.Modal(groupPunchModalEl);
 
   // default history dates (last 7 days)
   if(histFromEl && histToEl){
@@ -121,6 +132,43 @@ if (editModalEl && window.bootstrap?.Modal) {
     finally{ setBtnLoading(histLoadBtn, false); }
 
   });
+}
+
+function getAllGroups(){
+  // Static groups (no need to manage them in Sheets/DB)
+  return ["A", "B", "C"];
+}
+
+function renderGroupPunchRadios(selected){
+  if(!groupPunchRadiosEl) return;
+  const groups = getAllGroups();
+  if(!groups.length){
+    groupPunchRadiosEl.innerHTML = '<div class="text-muted2 small">Aucun groupe trouvé.</div>';
+    return;
+  }
+  const sel = normGroup(selected) || (normGroup(groupFilterEl?.value || "") || groups[0]);
+  lastGroupPunchSelection = sel;
+  groupPunchRadiosEl.innerHTML = groups.map(g => {
+    const id = `gp_${g}`;
+    return `
+      <label class="form-check text-white me-2">
+        <input class="form-check-input" type="radio" name="groupPunch" id="${escapeHtml(id)}" value="${escapeHtml(g)}" ${g===sel?'checked':''}>
+        <span class="form-check-label">Groupe ${escapeHtml(g)}</span>
+      </label>
+    `;
+  }).join('');
+
+  // hint + reset message
+  try{
+    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === normGroup(sel)).length;
+    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${sel} » : ${inGroup}. Date : ${todayISO}`;
+  }catch(e){
+    if(groupPunchHintEl) groupPunchHintEl.textContent = `Date : ${todayISO}`;
+  }
+  if(groupPunchMsgEl){
+    groupPunchMsgEl.textContent = "";
+    groupPunchMsgEl.className = "small mt-2";
+  }
 }
 const editForm = document.getElementById("editForm");
 
@@ -236,8 +284,10 @@ function setGroupRadios(prefix, group){
   const g = normGroup(group) || "A";
   const a = document.getElementById(prefix + "A");
   const b = document.getElementById(prefix + "B");
+  const c = document.getElementById(prefix + "C");
   if(a) a.checked = (g === "A");
   if(b) b.checked = (g === "B");
+  if(c) c.checked = (g === "C");
   // keep hidden inputs (for backward compatibility)
   if(prefix === "groupAdd") { if(groupEl) groupEl.value = g; }
   if(prefix === "groupEdit") { if(editGroupEl) editGroupEl.value = g; }
@@ -276,6 +326,8 @@ function refreshGroupDatalist(){
     .sort((a,b)=>a.localeCompare(b, "fr"));
   groupDatalistEl.innerHTML = groups.map(g => `<option value="${escapeHtml(g)}"></option>`).join("");
 }
+
+
 
 
 async function refreshTodayPunches(){
@@ -449,10 +501,13 @@ function bindUI(){
   try{
     const openAddBtn = document.getElementById("openAddBtn");
     if(openAddBtn) openAddBtn.classList.toggle("d-none", !isSuper());
-  }catch(e){
+  }catch(e){}
 
   // restore group filter
-  try{ const g = localStorage.getItem("pointage_group_filter") || ""; if(groupFilterEl) groupFilterEl.value = g; }catch(e){}
+  try{
+    const g = localStorage.getItem("pointage_group_filter") || "";
+    if(groupFilterEl) groupFilterEl.value = g;
+  }catch(e){}
 }
 
 scanBtn?.addEventListener("click", ()=>{
@@ -460,8 +515,72 @@ scanBtn?.addEventListener("click", ()=>{
   location.href = "./scan.html";
 });
 
+groupPunchBtn?.addEventListener("click", async ()=>{
+  if(!isSuper()) return;
+  // ensure we have volunteers loaded at least once
+  if(!volunteersCache.length){
+    try{ await load(true, true); }catch(e){}
+  }
+  renderGroupPunchRadios(lastGroupPunchSelection);
+  groupPunchModal?.show();
+});
+
+groupPunchRadiosEl?.addEventListener('change', ()=>{
+  const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
+  if(!selected) return;
+  lastGroupPunchSelection = selected;
+  try{
+    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === selected).length;
+    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${selected} » : ${inGroup}. Date : ${todayISO}`;
+  }catch(e){}
+});
+
+groupPunchDoBtn?.addEventListener('click', async ()=>{
+  if(!isSuper()) return;
+  const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
+  if(!selected){
+    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Veuillez choisir un groupe."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
+    return;
+  }
+  lastGroupPunchSelection = selected;
+  if(groupPunchMsgEl){ groupPunchMsgEl.textContent = ""; groupPunchMsgEl.className = "small mt-2"; }
+
+  setBtnLoading(groupPunchDoBtn, true, "Pointage...");
+  try{
+    const res = await apiPunchGroup(selected, todayISO);
+    if(!res.ok){
+      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
+      if(groupPunchMsgEl){
+        const msg = res.error === "EMPTY_GROUP" ? "Aucun volontaire dans ce groupe." : ("Erreur: " + (res.error||"UNKNOWN"));
+        groupPunchMsgEl.textContent = msg;
+        groupPunchMsgEl.className = "small mt-2 text-danger";
+      }
+      return;
+    }
+
+    const punchedNew = Number(res.punchedNew || 0);
+    const already = Number(res.alreadyPunched || 0);
+    const total = Number(res.totalInGroup || 0);
+    if(groupPunchMsgEl){
+      groupPunchMsgEl.textContent = `✅ Terminé. Nouveaux pointages: ${punchedNew} • Déjà pointés: ${already} • Total groupe: ${total}`;
+      groupPunchMsgEl.className = "small mt-2 text-success";
+    }
+    toast(`Groupe ${selected}: +${punchedNew} pointage(s) ✅`);
+
+    // Refresh list status
+    todayISO = await refreshTodayPunches();
+    todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    renderFromCache();
+  }catch(e){
+    console.error(e);
+    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Erreur réseau."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
+  }finally{
+    setBtnLoading(groupPunchDoBtn, false);
+  }
+});
+
 refreshBtn?.addEventListener("click", () => load(true, true));
-scanBtn?.addEventListener("click", () => { location.href = "./scan.html"; });
+
   focusSearchBtn?.addEventListener('click', ()=>{ searchEl.focus(); searchEl.select(); });
   // mobile: focus on first tap anywhere
   let firstTapFocused=false;
@@ -562,6 +681,11 @@ logoutBtn?.addEventListener("click", logout);
     addMsg.className = "small";
     setGroupRadios("groupAdd", "A");
     if(qrCodeEl) qrCodeEl.value = "";
+    // Default: ne pas pointer immédiatement
+    try{
+      const r = document.querySelector('input[name="punchNowAdd"][value="no"]');
+      if(r) r.checked = true;
+    }catch(e){}
     addModal?.show();
   });
 
@@ -578,6 +702,7 @@ logoutBtn?.addEventListener("click", logout);
     const qrCode = (qrCodeEl ? (qrCodeEl.value || "") : "").trim();
     const phone = (phoneEl.value || "").trim();
     const group = getSelectedGroupAdd();
+    const punchNow = (document.querySelector('input[name="punchNowAdd"]:checked')?.value === "yes");
     if(groupEl) groupEl.value = group;
     if(!fullName){
       setInlineSpinner(addSpinnerEl, false);
@@ -613,15 +738,42 @@ logoutBtn?.addEventListener("click", logout);
       });
       writeLocalCache(volunteersCache);
 
-      addMsg.textContent = "✅ Volontaire ajouté";
-      addMsg.className = "small text-success";
+      // Optional: punch immediately after adding
+      let punchMsg = "";
+      if(punchNow){
+        try{
+          const punchRes = await apiPunch(res.id, todayISO || isoDate(new Date()));
+          if(!punchRes.ok){
+            if(punchRes.error === "ALREADY_PUNCHED"){
+              // include time if provided
+              const t = punchRes.punchedAt ? formatTimeLocal(punchRes.punchedAt) : "";
+              punchMsg = t ? ` (déjà pointé à ${t})` : " (déjà pointé)";
+            }else{
+              punchMsg = ` (pointage non enregistré: ${punchRes.error || "UNKNOWN"})`;
+            }
+          }else{
+            punchMsg = " (pointé aujourd’hui ✅)";
+          }
+        }catch(e){
+          punchMsg = " (pointage non enregistré: erreur réseau)";
+        }
+      }
+
+      addMsg.textContent = "✅ Volontaire ajouté" + punchMsg;
+      addMsg.className = punchNow ? "small text-success" : "small text-success";
       setInlineSpinner(addSpinnerEl, false);
       fullNameEl.value = "";
       badgeCodeEl.value = "";
       if(qrCodeEl) qrCodeEl.value = "";
       phoneEl.value = "";
 
-      setTimeout(()=> addModal?.hide(), 500);
+      // Refresh punches so the list shows the correct status
+      try{
+        todayISO = await refreshTodayPunches();
+        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+      }catch(e){}
+
+      setTimeout(()=> addModal?.hide(), 600);
       renderFromCache();
 
     }catch(err){
@@ -708,9 +860,6 @@ logoutBtn?.addEventListener("click", logout);
       setBtnLoading(submitBtn, false);
     }
   });
-
-}
-
 function applyRoleUI(){
   const superOnly = document.querySelectorAll('[data-super-only]');
   superOnly.forEach(el => { el.style.display = isSuper() ? '' : 'none'; });

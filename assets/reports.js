@@ -24,6 +24,11 @@ function renderUserPill(){
 }
 
 
+
+function isSuperAdmin(){
+  return String(localStorage.getItem("role") || "").toUpperCase() === "SUPER_ADMIN";
+}
+
 function normGroup(g){
   return String(g ?? "").trim().toUpperCase();
 }
@@ -54,12 +59,59 @@ function escapeHtml(s){
   return String(s ?? "").replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
+
+// --- PDF helpers (shared) ---
+async function loadAssetDataUrl(path){
+  // Returns a data: URL (image/png) for a local asset path.
+  // Works on https/http. For file://, falls back to <img> + canvas.
+  const toPngDataUrl = (img)=>{
+    try{
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth || img.width;
+      c.height = img.naturalHeight || img.height;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0);
+      return c.toDataURL("image/png");
+    }catch(e){
+      return null;
+    }
+  };
+
+  // file:// can't fetch reliably (CORS)
+  if(location.protocol === "file:"){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=> resolve(toPngDataUrl(img));
+      img.onerror = ()=> resolve(null);
+      img.src = path;
+    });
+  }
+
+  try{
+    const res = await fetch(path, { cache: "no-store" });
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve)=>{
+      const fr = new FileReader();
+      fr.onload = ()=> resolve(String(fr.result || ""));
+      fr.onerror = ()=> resolve(null);
+      fr.readAsDataURL(blob);
+    });
+  }catch(e){
+    return null;
+  }
+}
+
+
 const fromEl = document.getElementById("fromDate");
 const toEl = document.getElementById("toDate");
 const groupEl = document.getElementById("groupSelect");
 const loadBtn = document.getElementById("loadBtn");
 const exportBtn = document.getElementById("exportBtn");
 const pdfBtn = document.getElementById("pdfBtn");
+const pdfGroupedBtn = document.getElementById("pdfGroupedBtn");
 const totalEl = document.getElementById("totalVolunteers");
 const uniqueEl = document.getElementById("uniqueVolunteers");
 const absentsEl = document.getElementById("absents");
@@ -261,6 +313,7 @@ async function load(){
   bindAbsencesModal();
   bindDaysAbsences();
   renderUserPill();
+  if(pdfGroupedBtn && !isSuperAdmin()) pdfGroupedBtn.style.display = "none";
   
   const from = fromEl.value;
   const to = toEl.value;
@@ -584,7 +637,61 @@ async function exportPdf(){
       doc.setFont("helvetica","normal");
     }
 
-    const tableStartY = group ? (yTitle + 52) : (yTitle + 44);
+    // ---- Counts (top-left, above the table) ----
+    function frDate(iso){
+      const s = String(iso||"");
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+    }
+    function computeCountsByDate(rows){
+      const map = new Map(); // date -> Set(volunteer_id)
+      for(const r of (rows||[])){
+        const d = String(r.punch_date || "").trim();
+        if(!d) continue;
+        const vid = String(r.volunteer_id || r.volunteerId || "").trim();
+        if(!map.has(d)) map.set(d, new Set());
+        if(vid) map.get(d).add(vid);
+        else map.get(d).add(String(r.full_name||r.fullName||""));
+      }
+      return Array.from(map.entries())
+        .map(([date,set]) => ({ date, count: set.size }))
+        .sort((a,b)=>a.date.localeCompare(b.date));
+    }
+
+    const counts = computeCountsByDate(rowsSorted);
+    const sameDay = (String(from||"") && String(to||"") && String(from) === String(to));
+
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(11);
+
+    let y = group ? (yTitle + 52) : (yTitle + 44);
+    const leftX = margin;
+
+    if(sameDay){
+      const n = counts[0]?.count || 0;
+      doc.text(`Nombre pointés : ${n}`, leftX, y);
+      y += 12;
+    }else{
+      doc.text(`Nombre pointés par date :`, leftX, y);
+      y += 12;
+      doc.setFont("helvetica","normal");
+      // Prevent too tall header block
+      const maxLines = 12;
+      const list = counts.slice(0, maxLines);
+      for(const c of list){
+        doc.text(`- ${frDate(c.date)} : ${c.count}`, leftX, y);
+        y += 12;
+      }
+      if(counts.length > maxLines){
+        doc.text(`- ...`, leftX, y);
+        y += 12;
+      }
+      doc.setFont("helvetica","bold");
+    }
+
+    // Start table after the counts block
+    const tableStartY = y + 8;
+    doc.setFont("helvetica","normal");
 
     const rows = rowsSorted.map(r => (group ? ([
       r.punch_date || "",
@@ -622,9 +729,135 @@ async function exportPdf(){
   }
 }
 
+async function exportPdfGrouped(){
+  if(!isSuperAdmin()){
+    toast("Accès réservé au Super Admin.");
+    return;
+  }
+  if(!window.jspdf?.jsPDF){
+    toast("jsPDF indisponible (réseau).");
+    return;
+  }
+
+  try{
+    setBtnLoading(pdfGroupedBtn, true, "Préparation...");
+    showLoader("Préparation du PDF (volontaires par groupes)...");
+
+    const volsAll = await ensureVolunteers();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:"portrait", unit:"pt", format:"a4" });
+
+    const margin = 36;
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const leftX = margin;
+
+    // logo
+    const logoPath = (window.POINTAGE_CONFIG && window.POINTAGE_CONFIG.PDF_LOGO_PATH) || "./assets/logo-slot.png";
+    let logoDataUrl = await loadAssetDataUrl(logoPath);
+    if(logoDataUrl && /^data:image\/webp/i.test(String(logoDataUrl))){
+      const jpeg = await toJpegDataUrl(logoDataUrl);
+      if(jpeg) logoDataUrl = jpeg;
+    }
+
+    let top = 24;
+    let logoH = 0;
+    if(logoDataUrl){
+      // Draw centered logo
+      const maxW = 180;
+      const maxH = 70;
+      try{
+        // default guess ratio 3:1
+        const w = maxW;
+        const h = Math.min(maxH, Math.round(maxW/3));
+        logoH = h;
+        doc.addImage(logoDataUrl, "PNG", (pageW - w)/2, top, w, h);
+      }catch(e){
+        // ignore
+      }
+    }
+
+    // Header (same as other PDFs)
+    const yTitle = top + logoH + 32;
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(14);
+    doc.text("Pointage Volunteers FanZone OLM 12h-18h", pageW/2, yTitle, { align:"center" });
+
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(11);
+    doc.text("Répartition des volontaires par groupe", pageW/2, yTitle + 18, { align:"center" });
+
+    const groups = ["A","B","C"];
+    let y = yTitle + 52;
+
+    const normStr = (v)=> String(v ?? "").trim();
+    const getId = (v)=> normStr(v.id ?? v.volunteer_id ?? v.volunteerId ?? "");
+    const getName = (v)=> normStr(v.fullName ?? v.full_name ?? v.name ?? v.nom ?? "");
+    const getBadge = (v)=> normStr(v.badgeCode ?? v.badge_code ?? "");
+    const getPhone = (v)=> normStr(v.phone ?? v.tel ?? v.telephone ?? "");
+    const getGroup = (v)=> normGroup(v.group ?? v.groupe ?? "");
+
+    for(const g of groups){
+      const volsG = (volsAll || [])
+        .filter(v => getGroup(v) === g)
+        .slice()
+        .sort((a,b)=> getName(a).localeCompare(getName(b), "fr", { sensitivity:"base" }));
+
+      const count = volsG.length;
+
+      // Page break if needed
+      if(y > pageH - 170){
+        doc.addPage();
+        y = 54;
+      }
+
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(13);
+      doc.text(`GROUPE ${g}`, leftX, y);
+      y += 16;
+
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.text(`Nombre de volontaires : ${count}`, leftX, y);
+      y += 16;
+
+      const body = volsG.map(v => ([
+        getId(v),
+        getName(v),
+        getBadge(v),
+        getPhone(v)
+      ]));
+
+      doc.autoTable({
+        startY: y,
+        head: [ ["ID","Nom complet","Badge","Téléphone"] ],
+        body,
+        styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [200,16,46], textColor: 255 },
+        theme: "striped",
+        margin: { left: margin, right: margin }
+      });
+
+      y = (doc.lastAutoTable?.finalY || y) + 26;
+    }
+
+    doc.save("repartition_volontaires_groupes.pdf");
+
+  }catch(e){
+    console.error(e);
+    toast("Erreur lors de l’export PDF (volontaires par groupes).");
+  }finally{
+    hideLoader();
+    setBtnLoading(pdfGroupedBtn, false, "📑 PDF volontaires (groupes)");
+  }
+}
+
+
 loadBtn.addEventListener("click", load);
 exportBtn.addEventListener("click", exportExcel);
 pdfBtn.addEventListener("click", exportPdf);
+if(pdfGroupedBtn) pdfGroupedBtn.addEventListener("click", exportPdfGrouped);
 logoutBtn.addEventListener("click", logout);
 
 requireSuperAdmin();
@@ -658,12 +891,13 @@ function getSelectedGroup(){
 
 function populateGroupSelect(_volunteers){
   if(!groupEl) return;
-  // Static groups: A / B
+  // Static groups: A / B / C
   const selected = groupEl.value;
   groupEl.innerHTML = [
     '<option value="">Tous les groupes</option>',
     '<option value="A">Groupe A</option>',
     '<option value="B">Groupe B</option>',
+    '<option value="C">Groupe C</option>',
   ].join("");
   if(selected) groupEl.value = selected;
 }
