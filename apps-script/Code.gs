@@ -754,6 +754,14 @@ function assignQrCode(p){
   }
   if(targetRow < 0) return { ok:false, error:"VOLUNTEER_NOT_FOUND" };
 
+  // Read current volunteer row (for logging + response)
+  const rowBefore = shV.getRange(targetRow, 1, 1, shV.getLastColumn()).getValues()[0];
+  const oldQr = (idx["qr_code"] !== undefined) ? String(rowBefore[idx["qr_code"]] || "").trim() : "";
+  const fullName = String(rowBefore[idx["full_name"]] || "").trim();
+  const badgeCode = String(rowBefore[idx["badge_code"]] || "").trim();
+  const phone = (idx.phone !== undefined) ? String(rowBefore[idx.phone] || "").trim() : "";
+  const group = pickGroup(idx, rowBefore);
+
   // Uniqueness check
   const qn = norm(qrCode);
   for(let i=1;i<h.values.length;i++){
@@ -766,15 +774,16 @@ function assignQrCode(p){
 
   // Write value
   shV.getRange(targetRow, idx["qr_code"] + 1).setValue(qrCode);
-  appendLog_(sess, "ASSIGN_QR", { volunteerId, volunteerName: fullName, badgeCode, group, result:"OK", details:{ changes:[{ field:"qrCode", old: oldQr, new: qrCode }] } });
 
-  // Return updated volunteer (minimal)
-  const row = shV.getRange(targetRow, 1, 1, shV.getLastColumn()).getValues()[0];
-  const oldQr = (idx["qr_code"] !== undefined) ? String(row[idx["qr_code"]] || "").trim() : "";
-  const fullName = String(row[idx["full_name"]] || "").trim();
-  const badgeCode = String(row[idx["badge_code"]] || "").trim();
-  const phone = (idx.phone !== undefined) ? String(row[idx.phone] || "").trim() : "";
-  const group = pickGroup(idx, row);
+  // Log
+  appendLog_(sess, "ASSIGN_QR", {
+    volunteerId,
+    volunteerName: fullName,
+    badgeCode,
+    group,
+    result:"OK",
+    details:{ changes:[{ field:"qrCode", old: oldQr, new: qrCode }] }
+  });
 
   return { ok:true, id: volunteerId, fullName, badgeCode, qrCode, phone, group };
 }
