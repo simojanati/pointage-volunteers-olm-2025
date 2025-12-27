@@ -81,6 +81,10 @@ function apiAssignQrCode(volunteerId, qrCode){
 }
 
 
+function apiListLogs(limit=500){
+  return jsonpRequest({ action:"listLogs", limit: String(limit) });
+}
+
 async function apiLogin(username, pin){
   return jsonpRequest({ action:"login", username, pin });
 }

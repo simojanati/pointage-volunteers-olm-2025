@@ -271,7 +271,7 @@ function renderUserPill(){
   const u = localStorage.getItem('username') || '—';
   const r = (localStorage.getItem('role') || '—').toUpperCase();
   const roleClass = r === 'SUPER_ADMIN' ? 'badge-role-super' : (r === 'ADMIN' ? 'badge-role-admin' : 'badge-role-unknown');
-  el.innerHTML = `<span class="me-2">${escapeHtml(u)}</span><span class="badge ${roleClass}">${escapeHtml(r)}</span>`;
+  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(u)}</span><span class="badge ${roleClass}">${escapeHtml(r)}</span>`;
 }
 
 renderUserPill();

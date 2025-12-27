@@ -17,7 +17,7 @@ function renderUserPill(){
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
 
   // Always keep pill on the left of the first visible action button (Rapports/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
@@ -136,7 +136,7 @@ if (editModalEl && window.bootstrap?.Modal) {
 
 function getAllGroups(){
   // Static groups (no need to manage them in Sheets/DB)
-  return ["A", "B", "C"];
+  return ["A","B"];
 }
 
 function renderGroupPunchRadios(selected){

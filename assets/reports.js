@@ -6,7 +6,7 @@ function renderUserPill(){
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
 
   // Always keep pill on the left of the first visible action button (Rapports/Pointage/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
@@ -58,6 +58,18 @@ function applyGroupFilter(){
 function escapeHtml(s){
   return String(s ?? "").replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
+
+
+function formatPhoneForPdf(phone){
+  const p = String(phone || "").trim();
+  if(!p) return "";
+  const cleaned = p.replace(/\s+/g, "");
+  if(cleaned.startsWith("+")) return cleaned;
+  if(cleaned.startsWith("0")) return "+212" + cleaned.slice(1);
+  if(cleaned.startsWith("212")) return "+212" + cleaned.slice(3);
+  return "+212" + cleaned;
+}
+
 
 
 // --- PDF helpers (shared) ---
@@ -313,6 +325,17 @@ async function load(){
   bindAbsencesModal();
   bindDaysAbsences();
   renderUserPill();
+
+const logsBtn = document.getElementById("logsBtn");
+if(logsBtn){
+  const role = (localStorage.getItem("role") || "").toUpperCase();
+  if(role !== "SUPER_ADMIN"){
+    logsBtn.style.display = "none";
+  }else{
+    logsBtn.addEventListener("click", () => window.location.href = "logs.html");
+  }
+}
+
   if(pdfGroupedBtn && !isSuperAdmin()) pdfGroupedBtn.style.display = "none";
   
   const from = fromEl.value;
@@ -693,24 +716,17 @@ async function exportPdf(){
     const tableStartY = y + 8;
     doc.setFont("helvetica","normal");
 
-    const rows = rowsSorted.map(r => (group ? ([
-      r.punch_date || "",
-      (r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : ""),
-      r.full_name || "",
-      r.badge_code || "",
-      r.phone || ""
-    ]) : ([
-      r.punch_date || "",
-      (r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : ""),
-      r.full_name || "",
-      r.badge_code || "",
-      r.phone || "",
-      (r.group || r.groupe || "")
-    ])));
+    const isSameDate = !!from && !!to && String(from) === String(to);
+    const headCols = isSameDate ? ["Nom complet","Badge","Téléphone"] : ["Date","Nom complet","Badge","Téléphone"];
+    const rows = rowsSorted.map(r => (
+      isSameDate
+        ? [ (r.full_name || ""), (r.badge_code || ""), formatPhoneForPdf(r.phone) ]
+        : [ (r.punch_date || ""), (r.full_name || ""), (r.badge_code || ""), formatPhoneForPdf(r.phone) ]
+    ));
 
     doc.autoTable({
       startY: tableStartY,
-      head: [ group ? ["Date","Heure","Nom complet","Badge","Téléphone"] : ["Date","Heure","Nom complet","Badge","Téléphone","Groupe"] ],
+      head: [ headCols ],
       body: rows,
       styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
       headStyles: { fillColor: [200,16,46], textColor: 255 },
@@ -788,7 +804,7 @@ async function exportPdfGrouped(){
     doc.setFontSize(11);
     doc.text("Répartition des volontaires par groupe", pageW/2, yTitle + 18, { align:"center" });
 
-    const groups = ["A","B","C"];
+    const groups = ["A","B"];
     let y = yTitle + 52;
 
     const normStr = (v)=> String(v ?? "").trim();
@@ -823,15 +839,13 @@ async function exportPdfGrouped(){
       y += 16;
 
       const body = volsG.map(v => ([
-        getId(v),
         getName(v),
-        getBadge(v),
-        getPhone(v)
+        getBadge(v)
       ]));
 
       doc.autoTable({
         startY: y,
-        head: [ ["ID","Nom complet","Badge","Téléphone"] ],
+        head: [ ["Nom complet","Badge"] ],
         body,
         styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [200,16,46], textColor: 255 },
@@ -897,7 +911,6 @@ function populateGroupSelect(_volunteers){
     '<option value="">Tous les groupes</option>',
     '<option value="A">Groupe A</option>',
     '<option value="B">Groupe B</option>',
-    '<option value="C">Groupe C</option>',
   ].join("");
   if(selected) groupEl.value = selected;
 }

@@ -227,3 +227,46 @@ code{
   /* make small buttons a bit tighter on very small screens */
   #navActions .btn{ padding: .28rem .55rem; }
 }
+
+/* Logs page inputs: keep dark theme on mobile/desktop */
+.bg-app .form-control.bg-dark::placeholder{ color: rgba(255,255,255,.45); }
+.bg-app .form-control.bg-dark:focus,
+.bg-app .form-select.bg-dark:focus{
+  background-color: #0b1220;
+  color: #fff;
+  border-color: rgba(255,255,255,.35);
+  box-shadow: 0 0 0 .2rem rgba(81,120,255,.15);
+}
+
+
+/* Logs filters: dark inputs + selects */
+#filterUser{
+  background-color: rgba(255,255,255,.08) !important;
+  color:#fff !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+#filterAction, #filterResult{
+  background-color: rgba(255,255,255,.08) !important;
+  color:#fff !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+#filterAction option, #filterResult option{
+  background-color: #0b1220 !important;
+  color: #fff !important;
+}
+
+/* Force dark selects (some browsers ignore bg-dark on <select>) */
+.form-select.bg-dark{
+  background-color: rgba(255,255,255,.08) !important;
+  color: #fff !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+.form-select.bg-dark option{
+  background-color: #0b1220;
+  color: #fff;
+}
+
+/* User pill username */
+#userPill .user-name{
+  color:#fff !important;
+}

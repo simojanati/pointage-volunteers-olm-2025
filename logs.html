@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pointage - Logs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/styles.css" rel="stylesheet">
+
+
+  <link rel="icon" href="./assets/icon/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/icon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/icon/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="./assets/icon/apple-touch-icon.png">
+  <link rel="manifest" href="./assets/icon/site.webmanifest">
+  <meta name="theme-color" content="#c8102e">
+</head>
+<body class="bg-app">
+  
+<nav class="navbar navbar-expand bg-app-nav">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="./admin.html">
+        <span class="logo-slot" aria-hidden="true"><img src="assets/MAR25.webp" class="img-fluid rounded-3"
+            alt="AFCON Morocco 2025"></span>
+        <span class="fw-bold">Pointage</span>
+      </a>
+    <div class="d-flex align-items-center gap-2 ms-auto" id="navActions">
+      <div id="userPill" class="d-flex align-items-center gap-2"></div>
+      <button id="logoutBtn" class="btn btn-outline-light btn-sm">Déconnexion</button>
+    </div>
+  </div>
+</nav>
+
+
+  
+<main class="container py-3">
+  <div class="card bg-glass shadow-lg">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h1 class="h5 mb-1 text-white">Logs</h1>
+          <div class="text-muted2 small">Historique des actions (pointage, QR, modifications…).</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+          <a class="btn btn-outline-light btn-sm" href="./reports.html">⬅ Retour Rapports</a>
+          <button id="refreshBtn" class="btn btn-outline-light btn-sm">🔄 Actualiser</button>
+        </div>
+      </div>
+
+      <div class="row g-2 mt-3 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label text-white-50 small mb-1">Utilisateur</label>
+          <input id="filterUser" class="form-control bg-dark text-white border-0 form-control-sm" placeholder="Ex: admin1" />
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label text-white-50 small mb-1">Action</label>
+          <select id="filterAction" class="form-select bg-dark text-white border-0 form-select-sm">
+            <option value="">Toutes</option>
+            <option value="PUNCH">PUNCH</option>
+            <option value="DELETE_PUNCH">DELETE_PUNCH</option>
+            <option value="PUNCH_GROUP">PUNCH_GROUP</option>
+            <option value="ASSIGN_QR">ASSIGN_QR</option>
+            <option value="ADD_VOLUNTEER">ADD_VOLUNTEER</option>
+            <option value="UPDATE_VOLUNTEER">UPDATE_VOLUNTEER</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label text-white-50 small mb-1">Résultat</label>
+          <select id="filterResult" class="form-select bg-dark text-white border-0 form-select-sm">
+            <option value="">Tous</option>
+            <option value="OK">OK</option>
+            <option value="ALREADY">ALREADY</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-2 d-grid">
+          <button id="clearFiltersBtn" class="btn btn-outline-light btn-sm">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div id="metaInfo" class="small text-muted2">—</div>
+        <div class="small text-muted2">Dernier en haut</div>
+      </div>
+
+      <div class="table-responsive mt-2">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="text-nowrap">Date (GMT+1)</th>
+              <th>Utilisateur</th>
+              <th>Action</th>
+              <th>Cible</th>
+              <th>Résultat</th>
+              <th>Détails</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="logsTbody">
+            <tr><td colspan="7" class="text-muted2">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="small text-muted2 mt-2">Astuce: filtrez par utilisateur + action pour retrouver rapidement une opération.</div>
+    </div>
+  </div>
+</main>
+
+<!-- Details Modal -->
+<div class="modal fade" id="logDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Détail du log</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <div id="logDetailBody" class="small"></div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/api.js"></script>
+  <script src="assets/logs.js"></script>
+</body>
+</html>
