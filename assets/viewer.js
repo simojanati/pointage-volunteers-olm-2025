@@ -61,8 +61,7 @@
 
     listEl.innerHTML = filtered.map(v => {
       const g = normGroup(v.group || v.groupe);
-      const gBadge = g ? `<span class="badge badge-soft text-white">👥 ${escapeHtml(g)}</span>` : `<span class="badge badge-soft text-white">👥 —</span>`;
-      const phone = v.phone ? `<span class="badge badge-soft text-white">📞 +212 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 —</span>`;
+      const gBadge = g ? `<span class="badge badge-soft text-white">👥 Groupe  ${escapeHtml(g)}</span>` : `<span class="badge badge-soft text-white">👥 —</span>`;
       const badge = v.badgeCode ? `<span class="badge badge-soft text-white">🏷️ ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷️ —</span>`;
 
       return `
@@ -75,7 +74,6 @@
               </div>
               <div class="d-flex flex-wrap gap-2 mt-2">
                 ${badge}
-                ${phone}
                 ${gBadge}
               </div>
             </div>
@@ -143,7 +141,6 @@
           <tr>
             <td class="fw-bold">${escapeHtml(r.punch_date || "")}</td>
             <td>${escapeHtml(time)}</td>
-            <td>${escapeHtml(r.badge_code || "")}</td>
           </tr>
         `;
       }).join("");
