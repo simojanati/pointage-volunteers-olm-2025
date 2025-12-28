@@ -226,6 +226,13 @@ code{
 
   /* make small buttons a bit tighter on very small screens */
   #navActions .btn{ padding: .28rem .55rem; }
+
+
+  /* Admin (Pointage) action buttons: stack on mobile */
+  #adminActions{ width:100%; flex-direction: column !important; align-items: stretch !important; gap: .5rem !important; }
+  #adminActions button{ width: 100%; }
+  #adminActions #countPill{ align-self: flex-start; width: auto; }
+
 }
 
 /* Logs page inputs: keep dark theme on mobile/desktop */
