@@ -270,3 +270,18 @@ code{
 #userPill .user-name{
   color:#fff !important;
 }
+
+
+/* KPI split A/B (Rapports) */
+.kpi-split{ font-size: 12px; line-height: 1.2; color: rgba(255,255,255,0.92); margin-left: 10px; }
+.kpi-split-line{ display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:2px; }
+.kpi-dot{ width:8px; height:8px; border-radius:999px; display:inline-block; }
+.kpi-dot-a{ background: rgba(81,120,255,0.95); }
+.kpi-dot-b{ background: rgba(200,16,46,0.85); }
+
+/* Mini cards (Rapports) */
+.list-card-mini{ padding:10px !important; }
+
+.kpi-letter{ font-weight:700; opacity:0.95; }
+
+.btn{ white-space: nowrap; }

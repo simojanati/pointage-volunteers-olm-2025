@@ -224,20 +224,23 @@ function requireRole(p, minRole){
 function doGet(e){
   const p = e.parameter || {};
   const callback = p.callback || "cb";
-  const token = p.token || "";
-
-  if (token !== TOKEN) return jsonp({ ok:false, error:"UNAUTHORIZED" }, callback);
-
   const action = p.action || "";
+  const isPublic = String(action).indexOf("public") === 0;
+
+  // Token uniquement pour actions non publiques
+  if(!isPublic){
+    const token = p.token || "";
+    if (token !== TOKEN) return jsonp({ ok:false, error:"UNAUTHORIZED" }, callback);
+  }
   try{
     if(action === "login") return jsonp(login(p), callback);
     if(action === "me") return jsonp(me(p), callback);
 
     // PUBLIC actions (Viewer, no sessionToken)
-    if(action === "publicListVolunteers"){
+    if(action === "publicListVolunteers" || action === "public_list_volunteers" || action === "PUBLIC_LIST_VOLUNTEERS"){
       return jsonp(listVolunteers(p.search || ""), callback);
     }
-    if(action === "publicVolunteerHistory"){
+    if(action === "publicVolunteerHistory" || action === "public_volunteer_history" || action === "PUBLIC_VOLUNTEER_HISTORY"){
       return jsonp(volunteerHistory(p), callback);
     }
 

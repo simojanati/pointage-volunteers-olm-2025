@@ -169,7 +169,7 @@
     } catch (err) {
       console.error(err);
       emptyStateEl.classList.remove("d-none");
-      emptyStateEl.textContent = "Impossible de charger les bénévoles. Vérifiez la configuration API_URL/TOKEN.";
+      emptyStateEl.textContent = "Impossible de charger les bénévoles. " + (err && err.message ? ("Détail: " + err.message) : "(Backend non à jour ou configuration API_URL).");
     } finally {
       showLoader(false);
     }

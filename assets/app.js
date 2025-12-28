@@ -9,6 +9,20 @@ const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
 function isSuper(){ return (localStorage.getItem('role')||'') === 'SUPER_ADMIN'; }
 
+
+// --- Planning groupes (alternance) ---
+// Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
+const PLANNING_BASE_DATE = "2025-12-27";
+const PLANNING_BASE_GROUP = "B";
+function plannedGroupForDate(dateISO){
+  if(!dateISO) return PLANNING_BASE_GROUP;
+  const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
+  const d1 = new Date(String(dateISO) + "T00:00:00");
+  const diffDays = Math.floor((d1.getTime() - d0.getTime()) / 86400000);
+  if(diffDays % 2 === 0) return PLANNING_BASE_GROUP;
+  return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
+}
+
 function renderUserPill(){
   const el = document.getElementById("userPill");
   if(!el) return;
@@ -92,7 +106,7 @@ if (editModalEl && window.bootstrap?.Modal) {
     const to = histToEl.value;
     histMsg.textContent = '';
     histMsg.className = 'small mt-3';
-    histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Chargement…</td></tr>';
+    histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Chargement…</td></tr>';
     setBtnLoading(histLoadBtn, true, "Chargement...");
 
     try{
@@ -101,7 +115,7 @@ if (editModalEl && window.bootstrap?.Modal) {
         if(res.error === 'NOT_AUTHENTICATED') { logout(); return; }
         histMsg.textContent = 'Erreur: ' + (res.error||'UNKNOWN');
         histMsg.className = 'small mt-3 text-danger';
-        histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">—</td></tr>';
+        histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">—</td></tr>';
         return;
       }
       const rows = res.rows || [];
@@ -112,7 +126,7 @@ if (editModalEl && window.bootstrap?.Modal) {
         return db.localeCompare(da);
       });
       if(!rows.length){
-        histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Aucun pointage sur la période.</td></tr>';
+        histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Aucun pointage sur la période.</td></tr>';
         return;
       }
       histTbody.innerHTML = rows.map(r=>{
@@ -120,8 +134,6 @@ if (editModalEl && window.bootstrap?.Modal) {
         return `<tr>`+
           `<td>${escapeHtml(r.punch_date||'')}</td>`+
           `<td>${escapeHtml(time)}</td>`+
-          `<td>${escapeHtml(r.full_name||'')}</td>`+
-          `<td>${escapeHtml(r.badge_code||'')}</td>`+
         `</tr>`;
       }).join('');
     }catch(e){
@@ -865,7 +877,30 @@ function applyRoleUI(){
   superOnly.forEach(el => { el.style.display = isSuper() ? '' : 'none'; });
 }
 
+function applyPlanningUI(){
+  try{
+    const todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0,10);
+    const workG = plannedGroupForDate(todayISO);
+
+    // default group filter = groupe actif du jour (si pas déjà choisi)
+    if(groupFilterEl && !groupFilterEl.value){
+      groupFilterEl.value = workG;
+    }
+
+    // title
+    const titleEl = document.getElementById("pageTitle");
+    if(titleEl){
+      titleEl.textContent = `Volontaires Groupe ${workG} : 12h - 18h`;
+    }
+  }catch(e){
+    console.warn("applyPlanningUI", e);
+  }
+}
+
+
+
 requireAdmin();
 bindUI();
 applyRoleUI();
+applyPlanningUI();
 load(true, true);
