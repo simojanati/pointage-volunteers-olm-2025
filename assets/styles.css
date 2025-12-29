@@ -292,3 +292,12 @@ code{
 .kpi-letter{ font-weight:700; opacity:0.95; }
 
 .btn{ white-space: nowrap; }
+
+
+/* Volunteer role icon */
+.chef-icon{ font-size: 14px; line-height: 1; opacity: .9; }
+
+
+/* fallback if no bootstrap warning */
+.btn-warning{ background:#f6d365; border-color:#f6d365; color:#111; }
+.btn-warning:hover{ filter:brightness(0.95); }

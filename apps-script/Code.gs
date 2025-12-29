@@ -8,6 +8,7 @@
 const TOKEN = "TOKEN_OLM_FANZONE_2025_12H_18H";
 
 const SHEET_VOL = "Volunteers";
+const SHEET_VOL_ARCHIVE = "ArchiveVolunteers";
 const SHEET_PUNCH = "Punches";
 const SHEET_USERS = "Users";
 const SHEET_LOGS = "Logs";
@@ -290,6 +291,18 @@ function doGet(e){
       p.__session = auth.session;
       return jsonp(updateVolunteer(p), callback);
     }
+    if(action === "deleteVolunteer"){
+      const auth = requireRole(p, "SUPER_ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      p.__session = auth.session;
+      return jsonp(deleteVolunteer(p), callback);
+    }
+    if(action === "runAutoPunchRoles"){
+      const auth = requireRole(p, "ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      p.__session = auth.session;
+      return jsonp(runAutoPunchRolesNow(p), callback);
+    }
     if(action === "reportSummary"){
       const auth = requireRole(p, "ADMIN");
       if(!auth.ok) return jsonp(auth, callback);
@@ -367,6 +380,7 @@ function listVolunteers(search){
   if(!sh) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
   ensureHeader(sh, "group");
   ensureHeader(sh, "qr_code");
+  ensureHeader(sh, "role");
   const h = headerIndex(sh);
   if(!h.ok) return h;
 
@@ -388,7 +402,8 @@ function listVolunteers(search){
       const hay = norm(fullName) + " " + norm(badgeCode) + " " + norm(qrCode) + " " + norm(phone) + " " + norm(group);
       if(!hay.includes(q)) return;
     }
-    out.push({ id, fullName, badgeCode, qrCode, phone, group });
+    const role = (idx["role"] !== undefined) ? String(r[idx["role"]] || "").trim() : "";
+    out.push({ id, fullName, badgeCode, qrCode, phone, group, role });
   });
 
   return { ok:true, volunteers: out };
@@ -588,6 +603,7 @@ function addVolunteer(p){
   if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
   ensureHeader(shV, "group");
   ensureHeader(shV, "qr_code");
+  ensureHeader(shV, "role");
   const hv = headerIndex(shV);
   if(!hv.ok) return hv;
   const iv = hv.idx;
@@ -641,6 +657,7 @@ function updateVolunteer(p){
 
   ensureHeader(shV, "group");
   ensureHeader(shV, "qr_code");
+  ensureHeader(shV, "role");
   ensureHeader(shP, "group");
   const hv = headerIndex(shV);
   const hp = headerIndex(shP);
@@ -728,6 +745,85 @@ function updateVolunteer(p){
   }
   return { ok:true };
 }
+
+function deleteVolunteer(p){
+  const sess = p.__session || null;
+  const id = String(p.id || "").trim();
+  if(!id) return { ok:false, error:"MISSING_ID" };
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
+  if(!sh) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
+
+  ensureHeader(sh, "group");
+  ensureHeader(sh, "qr_code");
+  ensureHeader(sh, "role");
+
+  const h = headerIndex(sh);
+  if(!h.ok) return h;
+
+  const idx = h.idx;
+  const values = h.values;
+
+  let rowToDelete = -1;
+  let snapshot = null;
+
+  for(let r=1; r<values.length; r++){
+    const row = values[r];
+    if(String(row[idx.id] || "").trim() === id){
+      rowToDelete = r + 1; // sheet row index (1-based)
+      snapshot = {
+        id,
+        fullName: String(row[idx["full_name"]] || "").trim(),
+        badgeCode: String(row[idx["badge_code"]] || "").trim(),
+        qrCode: (idx["qr_code"] !== undefined) ? String(row[idx["qr_code"]] || "").trim() : "",
+        phone: String(row[idx.phone] || "").trim(),
+        group: pickGroup(idx, row),
+        role: (idx["role"] !== undefined) ? String(row[idx["role"]] || "").trim() : ""
+      };
+      break;
+    }
+  }
+
+  if(rowToDelete < 0) return { ok:false, error:"NOT_FOUND" };
+
+  // Archive before delete (keep historical punches intact)
+  const shA = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL_ARCHIVE) || SpreadsheetApp.getActive().insertSheet(SHEET_VOL_ARCHIVE);
+  ensureHeader(shA, "deleted_at");
+  ensureHeader(shA, "deleted_by");
+  ensureHeader(shA, "id");
+  ensureHeader(shA, "full_name");
+  ensureHeader(shA, "badge_code");
+  ensureHeader(shA, "qr_code");
+  ensureHeader(shA, "phone");
+  ensureHeader(shA, "group");
+  ensureHeader(shA, "role");
+
+  const ha = headerIndex(shA);
+  const ia = ha.idx;
+
+  const deletedAt = Utilities.formatDate(new Date(), "GMT+1", "dd/MM/yyyy HH:mm:ss") + " (GMT+1)";
+  const deletedBy = sess ? String(sess.username || "") : "";
+
+  const rowA = [];
+  rowA[ia["deleted_at"]] = deletedAt;
+  rowA[ia["deleted_by"]] = deletedBy;
+  rowA[ia["id"]] = snapshot.id || "";
+  rowA[ia["full_name"]] = snapshot.fullName || "";
+  rowA[ia["badge_code"]] = snapshot.badgeCode || "";
+  rowA[ia["qr_code"]] = snapshot.qrCode || "";
+  rowA[ia["phone"]] = snapshot.phone || "";
+  rowA[ia["group"]] = snapshot.group || "";
+  rowA[ia["role"]] = snapshot.role || "";
+
+  shA.appendRow(rowA);
+
+
+  sh.deleteRow(rowToDelete);
+
+  appendLog_(sess, "DELETE_VOLUNTEER", { volunteerId: id, result:"OK", deleted: snapshot });
+  return { ok:true };
+}
+
 
 
 function assignQrCode(p){
@@ -1073,4 +1169,146 @@ function volunteerHistory(p){
   });
 
   return { ok:true, rows };
+}
+
+
+/**
+ * === AUTO POINTAGE DES RESPONSABLES / CHEFS (ROLE REMPLI) ===
+ *
+ * Objectif:
+ * - Chaque jour à 10h, créer automatiquement un pointage pour tous les bénévoles
+ *   dont le champ "role" est renseigné.
+ * - Le pointage créé est daté du jour (punch_date) et avec une heure fixe 15:00.
+ *
+ * IMPORTANT:
+ * - Le trigger utilise le fuseau horaire du projet Apps Script (à vérifier).
+ *   Recommandé: Africa/Casablanca.
+ */
+
+// Helper: parse yyyy-MM-dd -> Date (local TZ)
+function parseYMD_(ymd){
+  const m = String(ymd||"").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  return { y, mo, d };
+}
+
+function autoPunchRoles_(dateYmd, hour, minute, opts){
+  opts = opts || {};
+  const dryRun = (opts.dryRun === true || String(opts.dryRun||"") === "1");
+  const sess = opts.session || null;
+
+  const shP = SpreadsheetApp.getActive().getSheetByName(SHEET_PUNCH);
+  const shV = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL);
+  if(!shP) return { ok:false, error:"PUNCH_SHEET_NOT_FOUND" };
+  if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
+
+  ensureHeader(shP, "group");
+  ensureHeader(shV, "group");
+  ensureHeader(shV, "qr_code");
+  ensureHeader(shV, "role");
+
+  const hp = headerIndex(shP);
+  const hv = headerIndex(shV);
+  if(!hp.ok) return hp;
+  if(!hv.ok) return hv;
+
+  const ip = hp.idx;
+  const iv = hv.idx;
+
+  // Role volunteers
+  const vrows = hv.values.slice(1);
+  const roleVols = [];
+  vrows.forEach(r => {
+    const role = (iv["role"] !== undefined) ? String(r[iv["role"]]||"").trim() : "";
+    if(!role) return;
+    const id = String(r[iv.id]||"").trim();
+    if(!id) return;
+    roleVols.push({
+      id,
+      fullName: String(r[iv["full_name"]]||"").trim(),
+      badgeCode: String(r[iv["badge_code"]]||"").trim(),
+      group: pickGroup(iv, r),
+      role
+    });
+  });
+
+  // Already punched set for the date
+  const existing = new Set();
+  const prows = hp.values.slice(1);
+  prows.forEach(r => {
+    const d = toYMD(r[ip.punch_date]);
+    if(d !== dateYmd) return;
+    const vid = String(r[ip.volunteer_id]||"").trim();
+    if(vid) existing.add(vid);
+  });
+
+  const parsed = parseYMD_(dateYmd);
+  if(!parsed) return { ok:false, error:"INVALID_DATE", date: dateYmd };
+
+  const punchedAt = new Date(parsed.y, parsed.mo-1, parsed.d, Number(hour||15), Number(minute||0), 0);
+
+  let punchedNew = 0;
+  let already = 0;
+  const willPunch = [];
+
+  roleVols.forEach(v => {
+    if(existing.has(v.id)){
+      already++;
+      return;
+    }
+    willPunch.push(v);
+    if(dryRun) return;
+
+    const outRow = [];
+    hp.header.forEach(hname => {
+      if(hname === "punch_date") outRow.push(dateYmd);
+      else if(hname === "volunteer_id") outRow.push(v.id);
+      else if(hname === "punched_at") outRow.push(punchedAt);
+      else if(hname === "badge_code") outRow.push(v.badgeCode);
+      else if(hname === "full_name") outRow.push(v.fullName);
+      else if(hname === "group" || hname === "groupe") outRow.push(v.group);
+      else outRow.push("");
+    });
+    shP.appendRow(outRow);
+    punchedNew++;
+  });
+
+  appendLog_(sess, "AUTO_PUNCH_ROLE", {
+    date: dateYmd,
+    hour: String(hour||15).padStart(2,"0") + ":" + String(minute||0).padStart(2,"0"),
+    totalRoleVolunteers: roleVols.length,
+    punchedNew,
+    alreadyPunched: already,
+    dryRun
+  });
+
+  return {
+    ok:true,
+    date: dateYmd,
+    punchTime: String(hour||15).padStart(2,"0") + ":" + String(minute||0).padStart(2,"0"),
+    totalRoleVolunteers: roleVols.length,
+    punchedNew,
+    alreadyPunched: already,
+    dryRun: false,
+    sample: willPunch.slice(0, 10).map(v => ({ id:v.id, badgeCode:v.badgeCode, fullName:v.fullName, role:v.role, group:v.group }))
+  };
+}
+
+/**
+ * Trigger quotidien (10h): crée les pointages à 15h pour les bénévoles ayant un role.
+ * (Fonction à utiliser dans un déclencheur time-based)
+ */
+
+/** Installer le déclencheur quotidien à 10h (heure du projet Apps Script). */
+
+/** Tester sans attendre 10h: DRY-RUN (n'écrit rien). */
+
+/** Tester maintenant en écrivant (à utiliser avec prudence: évite les doublons). */
+function runAutoPunchRolesNow(p){
+  const sess = p && p.__session ? p.__session : null;
+  const date = (p && p.date) ? String(p.date).trim() : toYMD(new Date());
+
+  // IMPORTANT: Always write (no dry-run) for this action.
+  return autoPunchRoles_(date, 15, 0, { dryRun:false, session: sess });
 }

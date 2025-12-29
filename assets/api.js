@@ -82,6 +82,10 @@ async function apiUpdateVolunteer(id, fullName, badgeCode="", qrCode="", phone="
   return jsonpRequest({ action:"updateVolunteer", id: String(id), fullName, badgeCode, qrCode, phone, group });
 }
 
+async function apiDeleteVolunteer(id){
+  return jsonpRequest({ action:"deleteVolunteer", id: String(id) });
+}
+
 
 function apiAssignQrCode(volunteerId, qrCode){
   return jsonpRequest({ action:"assignQrCode", volunteerId: String(volunteerId), qrCode: String(qrCode || "") });
@@ -129,4 +133,11 @@ async function apiPublicVolunteerHistory(volunteerId, from="", to=""){
     if(res && res.ok) return res;
   }
   return res;
+}
+
+
+async function apiRunAutoPunchRoles(dryRun=false, date=""){
+  const payload = { action:"runAutoPunchRoles" };
+  if(date) payload.date = String(date);
+  return jsonpRequest(payload);
 }

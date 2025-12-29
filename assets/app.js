@@ -4,10 +4,14 @@ const groupFilterEl = document.getElementById("groupFilter");
 const refreshBtn = document.getElementById("refreshBtn");
 const scanBtn = document.getElementById("scanBtn");
 const groupPunchBtn = document.getElementById("groupPunchBtn");
+const autoPunchRolesBtn = document.getElementById("autoPunchRolesBtn");
+const autoPunchRolesDone = document.getElementById("autoPunchRolesDone");
+const autoPunchRolesStatus = document.getElementById("autoPunchRolesStatus");
 const countPill = document.getElementById("countPill");
 const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
 function isSuper(){ return (localStorage.getItem('role')||'') === 'SUPER_ADMIN'; }
+function isAdminOrSuper(){ const r=(localStorage.getItem('role')||''); return r==='SUPER_ADMIN' || r==='ADMIN'; }
 
 
 // --- Planning groupes (alternance) ---
@@ -350,6 +354,51 @@ async function refreshTodayPunches(){
   return today;
 }
 
+
+function computeRolePunchStatus_(){
+  const roleVols = (volunteersCache || []).filter(v => String(v.role || "").trim() !== "");
+  const punchedIds = new Set(Array.from((punchedMap || new Map()).keys()).map(k => String(k)));
+  const pending = roleVols.filter(v => !punchedIds.has(String(v.id)));
+  return { totalRole: roleVols.length, pendingCount: pending.length };
+}
+
+
+function refreshAutoPunchRolesBtn_(){
+  if(!autoPunchRolesBtn) return;
+
+  const role = (localStorage.getItem('role')||'');
+  const canSee = (role === 'SUPER_ADMIN' || role === 'ADMIN');
+
+  if(!canSee){
+    autoPunchRolesBtn.classList.add("d-none");
+    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+    return;
+  }
+
+  const st = computeRolePunchStatus_();
+
+  // no role volunteers -> hide all
+  if(st.totalRole === 0){
+    autoPunchRolesBtn.classList.add("d-none");
+    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+    return;
+  }
+
+  // all pointed -> show green confirmation
+  if(st.pendingCount === 0){
+    autoPunchRolesBtn.classList.add("d-none");
+    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.remove("d-none");
+    return;
+  }
+
+  // pending -> show warning button
+  if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+  autoPunchRolesBtn.classList.remove("d-none");
+  autoPunchRolesBtn.textContent = `👑 Pointer responsables (${st.pendingCount})`;
+}
+
+
+
 function getVolunteerById(id){
   const sid = String(id);
   return volunteersCache.find(v => String(v.id) === sid) || null;
@@ -400,6 +449,11 @@ function render(volunteers, todayISO) {
       ? `<button class="btn btn-outline-light btn-sm" data-action="edit" data-id="${escapeHtml(vid)}" title="Modifier">✏️</button>`
       : ``;
 
+    const btnDelete = isSuper()
+      ? `<button class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${escapeHtml(vid)}" title="Supprimer le bénévole">🗑️</button>`
+      : ``;
+
+
     const btnHist = `<button class="btn btn-outline-light btn-sm" data-action="history" data-id="${escapeHtml(vid)}" title="Historique">🕘</button>`;
 
     const btnUndo = punchedToday
@@ -412,6 +466,10 @@ function render(volunteers, todayISO) {
 
     const grp = normGroup(v.group || v.groupe || "");
 
+    const vRole = String(v.role || v.volunteerRole || "").trim();
+    const chefIcon = vRole ? `<span class="ms-2 chef-icon" title="Rôle: ${escapeHtml(vRole)}">⭐</span>` : ``;
+    const roleBadge = vRole ? `<span class="badge badge-soft text-white">🎖 ${escapeHtml(vRole)}</span>` : ``;
+
     const missingQr = !String(v.qrCode || "").trim();
     const qrWarn = missingQr
       ? `<span class="ms-1 text-warning qr-missing-icon" title="Ce bénévole n'a pas de QR/Code badge. Ajoutez un code pour pouvoir le scanner.">⚠️</span>`
@@ -420,17 +478,18 @@ function render(volunteers, todayISO) {
     return `
       <div class="list-card p-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
         <div class="w-100">
-          <div class="fw-bold text-truncate text-white">${escapeHtml(v.fullName || "")}</div>
+          <div class="fw-bold text-truncate text-white">${escapeHtml(v.fullName || "")}${chefIcon}</div>
           <div class="d-flex flex-wrap gap-2 mt-2">
             ${v.badgeCode ? `<span class="badge badge-soft text-white">🏷 ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷 (Sans badge)</span>`}${qrWarn}
             ${v.phone ? `<span class="badge badge-soft text-white">📞 +212 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 (Sans téléphone)</span>`}
+            ${roleBadge}
             ${grp ? `<span class="badge badge-soft text-white">👥 Groupe ${escapeHtml(grp)}</span>` : `<span class="badge badge-soft text-white">👥 Groupe (Non défini)</span>`}
             ${timeBadge}
             ${status}
           </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          ${btnEdit}${btnHist}
+          ${btnEdit}${btnDelete}${btnHist}
           ${btnUndo}
           ${btnPunch}
         </div>
@@ -497,6 +556,7 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
 
     const filtered = filterLocal(q);
     render(filtered, todayISO);
+    refreshAutoPunchRolesBtn_();
 
   }catch(e){
     console.error(e);
@@ -536,6 +596,51 @@ groupPunchBtn?.addEventListener("click", async ()=>{
   renderGroupPunchRadios(lastGroupPunchSelection);
   groupPunchModal?.show();
 });
+
+autoPunchRolesBtn?.addEventListener("click", async ()=>{
+  const role = (localStorage.getItem('role')||'');
+  if(!(role === 'SUPER_ADMIN' || role === 'ADMIN')) return;
+
+  const st = computeRolePunchStatus_();
+  if(st.pendingCount <= 0){
+    refreshAutoPunchRolesBtn_();
+    return;
+  }
+
+  if(!confirm(`Pointer ${st.pendingCount} responsable(s) (role renseigné) ?\n\nLes bénévoles déjà pointés aujourd'hui seront ignorés.`)){
+    return;
+  }
+
+  const prevText = autoPunchRolesBtn.textContent;
+  autoPunchRolesBtn.disabled = true;
+  autoPunchRolesBtn.textContent = "⏳ Pointage en cours...";
+
+  try{
+    const today = isoDate(new Date());
+    const res = await apiRunAutoPunchRoles(today);
+
+    if(!res){
+      toast("Erreur: aucune réponse du serveur (SERVER_ERROR).");
+      return;
+    }
+    if(!res.ok){
+      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
+      toast("Erreur: " + (res.error || "UNKNOWN_ACTION"));
+      return;
+    }
+
+    toast(`✅ Terminé: ${res.punchedNew || 0} ajouté(s), ${res.alreadyPunched || 0} déjà pointé(s).`);
+    await load(true, true);
+  }catch(e){
+    console.error(e);
+    toast("Erreur: " + (e?.message || "JSONP error"));
+  }finally{
+    autoPunchRolesBtn.disabled = false;
+    autoPunchRolesBtn.textContent = prevText;
+    refreshAutoPunchRolesBtn_();
+  }
+});
+
 
 groupPunchRadiosEl?.addEventListener('change', ()=>{
   const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
@@ -649,6 +754,22 @@ refreshBtn?.addEventListener("click", () => load(true, true));
         todayISO = await refreshTodayPunches();
         todayEl.textContent = `Aujourd'hui : ${todayISO}`;
         renderFromCache();
+      }
+
+      if(action === "delete"){
+        if(!isSuper()) return;
+        const v = getVolunteerById(id);
+        const label = v ? `${v.fullName || ""} (${v.badgeCode || ""})` : id;
+        if(!confirm(`Supprimer ce bénévole ?\n\n${label}\n\n⚠️ Les pointages (historique) ne seront pas supprimés.`)) return;
+        const res = await apiDeleteVolunteer(id);
+        if(!res.ok){
+          if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
+          toast("Erreur: " + (res.error || "UNKNOWN"));
+        }else{
+          toast("✅ Bénévole supprimé");
+          // Reload volunteers from backend then refresh UI
+          await load(true, true);
+        }
       }
 
       if(action === "edit"){
@@ -875,6 +996,9 @@ logoutBtn?.addEventListener("click", logout);
 function applyRoleUI(){
   const superOnly = document.querySelectorAll('[data-super-only]');
   superOnly.forEach(el => { el.style.display = isSuper() ? '' : 'none'; });
+
+  const adminOnly = document.querySelectorAll('[data-admin-only]');
+  adminOnly.forEach(el => { el.style.display = isAdminOrSuper() ? '' : 'none'; });
 }
 
 function applyPlanningUI(){
@@ -890,7 +1014,7 @@ function applyPlanningUI(){
     // title
     const titleEl = document.getElementById("pageTitle");
     if(titleEl){
-      titleEl.textContent = `Volontaires Groupe ${workG} : 12h - 18h`;
+      titleEl.textContent = `Volontaires Groupe ${workG} : 15h - 19h`;
     }
   }catch(e){
     console.warn("applyPlanningUI", e);

@@ -521,6 +521,7 @@ if(!window.ExcelJS){
       { header: "Nom complet", key: "name", width: 32 },
       { header: "Badge", key: "badge", width: 16 },
       { header: "Téléphone", key: "phone", width: 16 },
+      { header: "Rôle", key: "role", width: 18 },
       { header: "Groupe", key: "group", width: 16 },
     ];
     const colsOne = [
@@ -529,6 +530,7 @@ if(!window.ExcelJS){
       { header: "Nom complet", key: "name", width: 32 },
       { header: "Badge", key: "badge", width: 16 },
       { header: "Téléphone", key: "phone", width: 16 },
+      { header: "Rôle", key: "role", width: 18 },
     ];
     ws.columns = (group ? colsOne : colsAll);
 
@@ -815,17 +817,40 @@ if(!window.jspdf?.jsPDF){
     doc.setFont("helvetica","normal");
 
     const isSameDate = !!from && !!to && String(from) === String(to);
-    const headCols = isSameDate ? ["Nom complet","Badge","Téléphone"] : ["Date","Nom complet","Badge","Téléphone"];
-    const rows = rowsSorted.map(r => (
-      isSameDate
-        ? [ (r.full_name || ""), (r.badge_code || ""), formatPhoneForPdf(r.phone) ]
-        : [ (r.punch_date || ""), (r.full_name || ""), (r.badge_code || ""), formatPhoneForPdf(r.phone) ]
-    ));
 
+    const volsAllForRole = await ensureVolunteers();
+    const roleById = new Map((volsAllForRole||[]).map(v=>[String(v.id), String(v.role||"").trim()]));
+    const roleByBadge = new Map((volsAllForRole||[]).map(v=>[String(v.badgeCode||"").trim(), String(v.role||"").trim()]));
+    const roleForRow = (r)=>{
+      const byId = roleById.get(String(r.volunteer_id||"")) || "";
+      if(byId) return byId;
+      const b = String(r.badge_code||"").trim();
+      return (b && roleByBadge.get(b)) ? roleByBadge.get(b) : "";
+    };
+
+    const headCols = isSameDate ? ["Nom complet","Badge","Role"] : ["Date","Nom complet","Badge","Role"];
+
+    const rowsMeta = rowsSorted.map(r => {
+      const role = String(roleForRow(r) || "").trim();
+      const cells = isSameDate
+        ? [ (r.full_name || ""), (r.badge_code || ""), role ]
+        : [ (r.punch_date || ""), (r.full_name || ""), (r.badge_code || ""), role ];
+      return { cells, hasRole: !!role };
+    });
+    const rows = rowsMeta.map(x => x.cells);
     doc.autoTable({
       startY: tableStartY,
       head: [ headCols ],
       body: rows,
+      didParseCell: (data) => {
+        if(data.section === "body"){
+          const meta = rowsMeta[data.row.index];
+          if(meta && meta.hasRole){
+            data.cell.styles.fillColor = [240,240,240];
+            data.cell.styles.textColor = [0,0,0];
+          }
+        }
+      },
       styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
       headStyles: { fillColor: [200,16,46], textColor: 255 },
       theme: "striped",
@@ -856,7 +881,18 @@ if(!window.jspdf?.jsPDF){
         const getBadge = (v)=> normStr(v.badgeCode ?? v.badge_code ?? "");
         const getPhone = (v)=> normStr(v.phone ?? v.tel ?? v.telephone ?? "");
 
-        const offVols = (volsAll || []).filter(v => volGroup(v) === offGroup);
+        const pointedBadges = new Set((rowsSorted || []).map(r => normStr(r.badge_code ?? r.badgeCode ?? r.badge ?? "")).filter(Boolean));
+        const offVolsAll = (volsAll || []).filter(v => volGroup(v) === offGroup);
+        // On retire du groupe OFF ceux qui ont déjà pointé ce jour (ils sont déjà dans la table principale)
+        const offVols = offVolsAll.filter(v => {
+          const b = getBadge(v);
+          return !b || !pointedBadges.has(b);
+        });
+
+        if(!offVols || offVols.length === 0){
+          // Rien à afficher: tout le groupe OFF a pointé ou liste vide
+          return;
+        }
 
         const afterY = (doc.lastAutoTable?.finalY || tableStartY) + 14;
         doc.setFont("helvetica", "bold");
@@ -866,19 +902,29 @@ if(!window.jspdf?.jsPDF){
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(120);
-        doc.text(`Bénévoles du groupe OFF (non considérés comme actifs ce jour). Total: ${offVols.length}`, margin, afterY + 10);
+        doc.text(`Bénévoles du groupe OFF (hors pointés). Total: ${offVols.length}`, margin, afterY + 10);
         doc.setTextColor(0);
 
-        const offRows = offVols.map(v => ([
-          getName(v),
-          getBadge(v),
-          formatPhoneForPdf(getPhone(v))
-        ]));
+        const offRowsMeta = offVols.map(v => {
+          const role = String(v.role || v.volunteerRole || "").trim();
+          const cells = [ getName(v), getBadge(v), role ];
+          return { cells, hasRole: !!role };
+        });
+        const offRows = offRowsMeta.map(x => x.cells);
 
         doc.autoTable({
           startY: afterY + 18,
-          head: [ ["Nom complet","Badge","Téléphone"] ],
+          head: [ ["Nom complet","Badge","Téléphone","Role"] ],
           body: offRows,
+          didParseCell: (data) => {
+            if(data.section === "body"){
+              const meta = offRowsMeta[data.row.index];
+              if(meta && meta.hasRole){
+                data.cell.styles.fillColor = [240,240,240];
+                data.cell.styles.textColor = [0,0,0];
+              }
+            }
+          },
           styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
           headStyles: { fillColor: [17,24,39], textColor: 255 },
           theme: "striped",
@@ -993,15 +1039,26 @@ async function exportPdfGrouped(){
       doc.text(`Nombre de volontaires : ${count}`, leftX, y);
       y += 16;
 
-      const body = volsG.map(v => ([
-        getName(v),
-        getBadge(v)
-      ]));
+      const bodyMeta = volsG.map(v => {
+        const role = String(v.role || v.volunteerRole || "").trim();
+        const cells = [ getName(v), getBadge(v), role ];
+        return { cells, hasRole: !!role };
+      });
+      const body = bodyMeta.map(x => x.cells);
 
       doc.autoTable({
         startY: y,
-        head: [ ["Nom complet","Badge"] ],
+        head: [ ["Nom complet","Badge","Role"] ],
         body,
+        didParseCell: (data) => {
+          if(data.section === "body"){
+            const meta = bodyMeta[data.row.index];
+            if(meta && meta.hasRole){
+              data.cell.styles.fillColor = [240,240,240];
+              data.cell.styles.textColor = [0,0,0];
+            }
+          }
+        },
         styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [200,16,46], textColor: 255 },
         theme: "striped",
