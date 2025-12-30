@@ -1,3 +1,46 @@
+
+
+// === Sound helpers (WebAudio) ===
+let __audioCtx = null;
+function ensureAudioCtx_(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!__audioCtx) __audioCtx = new AC();
+  try{
+    if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{});
+  }catch(e){}
+  return __audioCtx;
+}
+function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
+  const ctx = ensureAudioCtx_();
+  if(!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g);
+  g.connect(ctx.destination);
+  const t = ctx.currentTime;
+  o.start(t);
+  try{
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + durSec);
+  }catch(e){}
+  o.stop(t + durSec);
+}
+function soundOk_(){
+  beep_(880, 0.10, 0.22, "sine");
+  setTimeout(()=>beep_(1175, 0.08, 0.18, "sine"), 120);
+  try{ navigator.vibrate && navigator.vibrate(40); }catch(e){}
+}
+function soundErr_(){
+  beep_(220, 0.14, 0.20, "square");
+  try{ navigator.vibrate && navigator.vibrate([30,30,30]); }catch(e){}
+}
+// Prime audio context on first user interaction (important on mobile)
+document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
+
 // Scan QR page (Admin & Super Admin)
 requireAdmin();
 
@@ -140,6 +183,8 @@ async function punchVolunteerAfterAssign(v, rawCode){
       setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
       playSuccessBeep();
       toast('✅ Pointage enregistré');
+    soundOk_();
+    soundOk_();
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
@@ -216,6 +261,7 @@ async function assignQrToVolunteer(volunteerId){
         assignInfoEl.textContent = '❌ Ce code QR est déjà utilisé par un autre bénévole.';
       }
       toast('Code QR déjà utilisé');
+    soundErr_();
     }else if(res?.error === 'NOT_AUTHENTICATED'){
       logout();
       return;
