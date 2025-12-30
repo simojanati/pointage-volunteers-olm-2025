@@ -1,3 +1,81 @@
+
+
+// === Scan success feedback (sound + overlay) ===
+let __scanAudioCtx = null;
+function __ensureScanAudioCtx_(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!__scanAudioCtx) __scanAudioCtx = new AC();
+  try{ if(__scanAudioCtx.state === "suspended") __scanAudioCtx.resume().catch(()=>{}); }catch(e){}
+  return __scanAudioCtx;
+}
+// prime silently on first user interaction (no UI)
+document.addEventListener("pointerdown", ()=>{ __ensureScanAudioCtx_(); }, { once:true });
+
+function __beepScanOk_(){
+  try{
+    const ctx = __ensureScanAudioCtx_();
+    if(!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.value = 0.18;
+    o.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    o.start(t);
+    try{
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    }catch(e){}
+    o.stop(t + 0.12);
+
+    setTimeout(()=>{
+      try{
+        const o2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        o2.type="sine";
+        o2.frequency.value=1175;
+        g2.gain.value=0.14;
+        o2.connect(g2); g2.connect(ctx.destination);
+        const t2 = ctx.currentTime;
+        o2.start(t2);
+        try{
+          g2.gain.setValueAtTime(0.14, t2);
+          g2.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.10);
+        }catch(e){}
+        o2.stop(t2 + 0.10);
+      }catch(e){}
+    }, 140);
+  }catch(e){}
+  try{ navigator.vibrate && navigator.vibrate(70); }catch(e){}
+}
+
+let __scanOverlayEl = null;
+let __scanOverlayTimer = null;
+
+function __showScanSuccessOverlay_(){
+  try{
+    if(!__scanOverlayEl){
+      const wrap = document.createElement("div");
+      wrap.id = "scanSuccessOverlay";
+      wrap.style.cssText =
+        "position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;" +
+        "background:rgba(0,0,0,.18);";
+      const img = document.createElement("img");
+      img.src = "assets/qr-code-succes.png";
+      img.alt = "Succès";
+      img.style.cssText = "width:min(240px,72vw);height:auto;filter:drop-shadow(0 10px 24px rgba(0,0,0,.35));";
+      wrap.appendChild(img);
+      __scanOverlayEl = wrap;
+      document.body.appendChild(__scanOverlayEl);
+    }
+    __scanOverlayEl.style.display = "flex";
+    if(__scanOverlayTimer) clearTimeout(__scanOverlayTimer);
+    __scanOverlayTimer = setTimeout(()=>{ try{ __scanOverlayEl.style.display='none'; }catch(e){} }, 2000);
+  }catch(e){}
+}
+
 // Scan QR page (Admin & Super Admin)
 requireAdmin();
 
@@ -288,7 +366,10 @@ async function processCode(rawCode, source='scan'){
     if(res?.ok){
       setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
       toast('✅ Pointage enregistré');
-      return;
+      
+      __beepScanOk_();
+      __showScanSuccessOverlay_();
+return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
       const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
