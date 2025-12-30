@@ -48,7 +48,6 @@ requireAdmin();
 
 // Son de confirmation (scan -> pointage OK)
 function playSuccessBeep(){ soundOk_(); }
-}
 
 const toastEl = document.getElementById('toast');
 const logoutBtn = document.getElementById('logoutBtn');
