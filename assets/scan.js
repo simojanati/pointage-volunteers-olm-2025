@@ -1,6 +1,25 @@
 // Scan QR page (Admin & Super Admin)
 requireAdmin();
 
+
+
+// Son de confirmation (scan -> pointage OK)
+function playSuccessBeep(){
+  try{
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.value = 0.08;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    setTimeout(()=>{ o.stop(); ctx.close(); }, 120);
+  }catch(e){}
+}
+
 const toastEl = document.getElementById('toast');
 const logoutBtn = document.getElementById('logoutBtn');
 const scanStatusEl = document.getElementById('scanStatus');
@@ -119,6 +138,7 @@ async function punchVolunteerAfterAssign(v, rawCode){
     const res = await apiPunch(v.id, today);
     if(res?.ok){
       setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
+      playSuccessBeep();
       toast('✅ Pointage enregistré');
       return;
     }

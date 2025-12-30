@@ -57,81 +57,56 @@
           </div>
         </div>
 
+        
         <div class="row g-2 mt-3">
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Total bénévoles</div>
-              <div class="d-flex align-items-start justify-content-between">
-                <div class="display-6 fw-bold" id="totalVolunteers">0</div>
-                <div class="kpi-split text-end">
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="totalGroupA">0</span></div>
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="totalGroupB">0</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="col-12 col-md-6">
+                      <div class="p-3 list-card">
+                        <div class="text-muted2 small">Total bénévoles</div>
+                        <div class="d-flex align-items-start justify-content-between">
+                          <div class="display-6 fw-bold" id="totalVolunteers">0</div>
+                          <div class="kpi-split text-end">
+                            <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="totalGroupA">0</span></div>
+                            <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="totalGroupB">0</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div
 
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Pointés (uniques)</div>
-              <div class="d-flex align-items-start justify-content-between">
-                <div class="display-6 fw-bold" id="uniqueVolunteers">0</div>
-                <div class="kpi-split text-end">
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="uniqueGroupA">0</span></div>
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="uniqueGroupB">0</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Absents</div>
-              <div class="d-flex align-items-start justify-content-between">
-                <div class="display-6 fw-bold" id="absents">0</div>
-                <div class="kpi-split text-end">
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="absentsGroupA">0</span></div>
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="absentsGroupB">0</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="col-12 col-md-6">
+                      <div class="p-3 list-card">
+                        <div class="text-muted2 small">Présence</div>
+                        <div class="d-flex align-items-start justify-content-between">
+                          <div>
+                            <div class="display-6 fw-bold" id="kpiRate">0/0</div>
+                          </div>
+                          <div class="kpi-split text-end">
+                            <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="presenceGroupA">0/0</span></div>
+                            <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="presenceGroupB">0/0</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div
         </div>
 
-<div class="row g-2 mt-3">
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Présence</div>
-              <div class="d-flex align-items-start justify-content-between">
-                <div>
-                  <div class="display-6 fw-bold" id="kpiRate">0/0</div>
-                </div>
-                <div class="kpi-split text-end">
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-a"></span><span class="kpi-letter">A</span><span id="presenceGroupA">0/0</span></div>
-                  <div class="kpi-split-line"><span class="kpi-dot kpi-dot-b"></span><span class="kpi-letter">B</span><span id="presenceGroupB">0/0</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="row g-2 mt-3">
+          <div class="col-12 col-md-6">
+                      <div class="p-3 list-card">
+                        <div class="text-muted2 small">Premier pointage</div>
+                        <div class="fw-semibold text-white" id="kpiFirst">—</div>
+                        <div class="small text-muted2" id="kpiFirstTime">—</div>
+                      </div>
+                    </div
 
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Premier pointage</div>
-              <div class="fw-semibold text-white" id="kpiFirst">—</div>
-              <div class="small text-muted2" id="kpiFirstTime">—</div>
-            </div>
-          </div>
-
-          <div class="col-12 col-md-4">
-            <div class="p-3 list-card">
-              <div class="text-muted2 small">Dernier pointage</div>
-              <div class="fw-semibold text-white" id="kpiLast">—</div>
-              <div class="small text-muted2" id="kpiLastTime">—</div>
-            </div>
-          </div>
+          <div class="col-12 col-md-6">
+                      <div class="p-3 list-card">
+                        <div class="text-muted2 small">Dernier pointage</div>
+                        <div class="fw-semibold text-white" id="kpiLast">—</div>
+                        <div class="small text-muted2" id="kpiLastTime">—</div>
+                      </div>
+                    </div
         </div>
 
-        <div class="mt-3 list-card">
+<div class="mt-3 list-card">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div>
               <div class="fw-semibold text-white">Graphique</div>

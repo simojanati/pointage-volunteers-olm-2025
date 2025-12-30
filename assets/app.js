@@ -707,6 +707,7 @@ refreshBtn?.addEventListener("click", () => load(true, true));
   // Actions (event delegation)
   listEl.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
+    e.preventDefault();
     if(!btn) return;
     const id = btn.dataset.id;
     const action = btn.dataset.action || btn.dataset.act;
@@ -741,6 +742,8 @@ refreshBtn?.addEventListener("click", () => load(true, true));
         todayISO = await refreshTodayPunches();
         todayEl.textContent = `Aujourd'hui : ${todayISO}`;
         renderFromCache();
+        // ensure UI interaction remains responsive after re-render
+        await new Promise(r=>setTimeout(r,0));
       }
 
       if(action === "undo"){
@@ -789,8 +792,11 @@ refreshBtn?.addEventListener("click", () => load(true, true));
       console.error(err);
       toast("Erreur inattendue.");
     }finally{
-      btn.disabled = false;
-      btn.innerHTML = old;
+      try{ btn.blur && btn.blur(); }catch(e){}
+      if(btn && btn.isConnected){
+        btn.disabled = false;
+        btn.innerHTML = old;
+      }
     }
   });
 

@@ -157,15 +157,9 @@ const pdfBtn = document.getElementById("pdfBtn");
 const pdfGroupedBtn = document.getElementById("pdfGroupedBtn");
 
 const totalEl = document.getElementById("totalVolunteers");
-const uniqueEl = document.getElementById("uniqueVolunteers");
-const absentsEl = document.getElementById("absents");
 const rateEl = document.getElementById("ratePct");
 const totalGroupAEl = document.getElementById("totalGroupA");
 const totalGroupBEl = document.getElementById("totalGroupB");
-const uniqueGroupAEl = document.getElementById("uniqueGroupA");
-const uniqueGroupBEl = document.getElementById("uniqueGroupB");
-const absentsGroupAEl = document.getElementById("absentsGroupA");
-const absentsGroupBEl = document.getElementById("absentsGroupB");
 const presenceGroupAEl = document.getElementById("presenceGroupA");
 const presenceGroupBEl = document.getElementById("presenceGroupB");
 const daysBody = document.getElementById("daysBody");
@@ -318,19 +312,11 @@ function renderSummary(data){
 
   const workAbsent = Math.max(0, workTotal - workPresent);
 
-  // Pointés (uniques): عدد pointés ديال groupe actif
-  if(uniqueEl) uniqueEl.textContent = String(workPresent);
-  if(uniqueGroupAEl) uniqueGroupAEl.textContent = String(presentCountA);
-  if(uniqueGroupBEl) uniqueGroupBEl.textContent = String(presentCountB);
-
-  // Absents: عدد الغياب ديال groupe actif
-  if(absentsEl) absentsEl.textContent = String(workAbsent);
-  if(absentsGroupAEl) absentsGroupAEl.textContent = String(Math.max(0, totalA - presentCountA));
-  if(absentsGroupBEl) absentsGroupBEl.textContent = String(Math.max(0, totalB - presentCountB));
 
   // Présence: afficher ratio "présents/total" du groupe actif
   const kpiRateEl = document.getElementById("kpiRate");
-  if(kpiRateEl) kpiRateEl.textContent = `${workPresent}/${workTotal}`;
+  const presenceTotal = presentCountA + presentCountB;
+  if(kpiRateEl) kpiRateEl.textContent = `${presenceTotal}/${workTotal}`;
 
   if(presenceGroupAEl) presenceGroupAEl.textContent = `${presentCountA}/${totalA}`;
   if(presenceGroupBEl) presenceGroupBEl.textContent = `${presentCountB}/${totalB}`;
@@ -437,13 +423,13 @@ if(logsBtn){
 showLoader("Chargement du rapport...");
 
   try{
-    const res = await apiReportSummary(from, to, group);
+    const res = await apiReportSummary(from, to, "");
     if(!res.ok){
       if(res.error === "NOT_AUTHENTICATED") { logout(); return; }
       throw new Error(res.error || "SUMMARY_ERROR");
     }
 
-    const pr = await apiReportPunches(from, to, group);
+    const pr = await apiReportPunches(from, to, "");
     if(!pr.ok){
       if(pr.error === "NOT_AUTHENTICATED") { logout(); return; }
       throw new Error(pr.error || "PUNCHES_ERROR");
@@ -601,7 +587,7 @@ if(!window.ExcelJS){
     const blob = new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `rapport_pointage_${from}_${to}.xlsx`;
+    a.download = `rapport_pointage_${from}.xlsx`;
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 800);
 
@@ -935,7 +921,7 @@ if(!window.jspdf?.jsPDF){
       }
     }
 
-    doc.save(`rapport_pointage_${from}_${to}.pdf`);
+    doc.save(`rapport_pointage_${from}.pdf`);
 
   }catch(e){
     console.error(e);
