@@ -47,20 +47,7 @@ requireAdmin();
 
 
 // Son de confirmation (scan -> pointage OK)
-function playSuccessBeep(){
-  try{
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    g.gain.value = 0.08;
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    setTimeout(()=>{ o.stop(); ctx.close(); }, 120);
-  }catch(e){}
+function playSuccessBeep(){ soundOk_(); }
 }
 
 const toastEl = document.getElementById('toast');
@@ -183,7 +170,6 @@ async function punchVolunteerAfterAssign(v, rawCode){
       setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
       playSuccessBeep();
       toast('✅ Pointage enregistré');
-    soundOk_();
     soundOk_();
       return;
     }
@@ -639,14 +625,19 @@ function onScanSuccess(decodedText){
 }
 
 toggleScanBtn?.addEventListener('click', async ()=>{
-  if(scanning) await stopScan();
+  
+  ensureAudioCtx_();
+if(scanning) await stopScan();
   else await startScan();
 });
 
+ensureAudioCtx_();
 switchCamBtn?.addEventListener('click', switchCamera);
 
 manualSubmitBtn?.addEventListener('click', async ()=>{
-  const code = (manualCodeEl.value || '').trim();
+  
+  ensureAudioCtx_();
+const code = (manualCodeEl.value || '').trim();
   if(!code){ toast('Veuillez saisir un code.'); return; }
   await processCode(code, 'manual');
   manualCodeEl.select();
