@@ -41,6 +41,28 @@ function soundErr_(){
 // Prime audio context on first user interaction (important on mobile)
 document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
 
+// Sound hint (mobile browsers require a user gesture)
+let __soundEnabled = false;
+function markSoundEnabled_(){
+  __soundEnabled = true;
+  const el = document.getElementById("soundHint");
+  if(el) el.remove();
+}
+document.addEventListener("pointerdown", ()=>{
+  ensureAudioCtx_();
+  markSoundEnabled_();
+}, { once:true });
+window.addEventListener("load", ()=>{
+  if(!document.getElementById("soundHint")){
+    const div = document.createElement("div");
+    div.id = "soundHint";
+    div.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:2000;background:rgba(0,0,0,.75);color:#fff;padding:10px 12px;border-radius:12px;font-size:13px;display:flex;gap:8px;align-items:center;justify-content:center;";
+    div.innerHTML = "🔊 Touchez l’écran une fois pour activer le son.";
+    document.body.appendChild(div);
+    setTimeout(()=>{ const el=document.getElementById('soundHint'); if(el) el.style.opacity='0.9'; }, 50);
+  }
+});
+
 // Scan QR page (Admin & Super Admin)
 requireAdmin();
 
@@ -473,6 +495,8 @@ function pickCameraRequest(){
 }
 
 async function startScan(){
+  ensureAudioCtx_(); // prime audio for beep/vibration
+
   if(scanning) return;
   await loadVolunteers();
 
@@ -649,10 +673,5 @@ manualCodeEl?.addEventListener('keydown', async (e)=>{
   }
 });
 
-// Auto start (nice UX) but keep safe: only if secure context
-if(window.isSecureContext){
-  // small delay so UI paints
-  setTimeout(()=> startScan(), 200);
-}else{
-  setStatus('Cliquez sur “Démarrer”. (Astuce : HTTPS permet l’accès à la caméra)', 'ok');
-}
+// Démarrage manuel (nécessaire pour activer le son / vibration sur mobile)
+setStatus('Cliquez sur “Démarrer” pour lancer la caméra. (Astuce : HTTPS est requis)', 'ok');
