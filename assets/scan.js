@@ -46,7 +46,37 @@ function soundErr_(){
 }
 
 // Prime audio context on first user interaction (important on mobile)
-document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
+document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); 
+
+// === Success overlay (image) + pause ===
+let __successOverlayEl = null;
+let __pauseUntilTs = 0;
+
+function showSuccessOverlay_(){
+  try{
+    if(!__successOverlayEl){
+      const wrap = document.createElement("div");
+      wrap.id = "successOverlay";
+      wrap.style.cssText =
+        "position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;" +
+        "background:rgba(0,0,0,.25);backdrop-filter:blur(2px);";
+      const img = document.createElement("img");
+      img.src = "assets/qr-code-succes.png";
+      img.alt = "Succès";
+      img.style.cssText = "width:min(220px,70vw);height:auto;filter:drop-shadow(0 8px 20px rgba(0,0,0,.35));";
+      wrap.appendChild(img);
+      __successOverlayEl = wrap;
+      document.body.appendChild(__successOverlayEl);
+    }
+    __successOverlayEl.style.display = "flex";
+  }catch(e){}
+}
+
+function hideSuccessOverlay_(){
+  try{ if(__successOverlayEl) __successOverlayEl.style.display = "none"; }catch(e){}
+}
+
+}, { once:true });
 
 // Sound hint (mobile browsers require a user gesture)
 let __soundEnabled = false;
@@ -76,7 +106,11 @@ requireAdmin();
 
 
 // Son de confirmation (scan -> pointage OK)
-function playSuccessBeep(){ soundOk_(); }
+function playSuccessBeep(){
+  try{ soundOk_(); }catch(e){}
+  try{ __okAudio && __okAudio.play && __okAudio.play().catch(()=>{}); }catch(e){}
+  try{ navigator.vibrate && navigator.vibrate(70); }catch(e){}
+}
 
 const toastEl = document.getElementById('toast');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -195,10 +229,18 @@ async function punchVolunteerAfterAssign(v, rawCode){
   try{
     const res = await apiPunch(v.id, today);
     if(res?.ok){
-      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
+      __pauseUntilTs = Date.now() + 2000;
+
+      try{ await stopScanner(); }catch(e){}
+
       playSuccessBeep();
-      toast('✅ Pointage enregistré');
-    soundOk_();
+      showSuccessOverlay_();
+
+      setTimeout(async ()=>{
+        hideSuccessOverlay_();
+        try{ await startScanner(); }catch(e){}
+      }, 2000);
+
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
@@ -639,6 +681,8 @@ async function processCode(rawCode, source='scan'){
 }
 
 function onScanSuccess(decodedText){
+  if(Date.now() < __pauseUntilTs) return;
+
   if(processing) return;
   processing = true;
 
