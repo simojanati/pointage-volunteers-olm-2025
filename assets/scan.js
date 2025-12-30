@@ -231,14 +231,11 @@ async function punchVolunteerAfterAssign(v, rawCode){
     if(res?.ok){
       __pauseUntilTs = Date.now() + 2000;
 
-      try{ await stopScanner(); }catch(e){}
-
       playSuccessBeep();
       showSuccessOverlay_();
 
-      setTimeout(async ()=>{
+      setTimeout(()=>{
         hideSuccessOverlay_();
-        try{ await startScanner(); }catch(e){}
       }, 2000);
 
       return;
