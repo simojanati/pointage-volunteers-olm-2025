@@ -1,67 +1,15 @@
-
-
-// === Sound helpers (WebAudio) ===
-let __audioCtx = null;
-function ensureAudioCtx_(){
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if(!AC) return null;
-  if(!__audioCtx) __audioCtx = new AC();
-  try{ if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{}); }catch(e){}
-  return __audioCtx;
-}
-function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
-  const ctx = ensureAudioCtx_();
-  if(!ctx) return;
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  g.gain.value = vol;
-  o.connect(g); g.connect(ctx.destination);
-  const t = ctx.currentTime;
-  o.start(t);
-  try{
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + durSec);
-  }catch(e){}
-  o.stop(t + durSec);
-}
-function soundOk_(){
-  beep_(880, 0.10, 0.20, "sine");
-  setTimeout(()=>beep_(1175, 0.08, 0.16, "sine"), 120);
-  try{ navigator.vibrate && navigator.vibrate(40); }catch(e){}
-}
-// Prime audio context on first user interaction
-document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
-
 const listEl = document.getElementById("list");
 const searchEl = document.getElementById("search");
 const groupFilterEl = document.getElementById("groupFilter");
 const refreshBtn = document.getElementById("refreshBtn");
+const syncBtn = document.getElementById("syncBtn");
+const syncCountEl = document.getElementById("syncCount");
+const offlineStatusEl = document.getElementById("offlineStatus");
 const scanBtn = document.getElementById("scanBtn");
-const groupPunchBtn = document.getElementById("groupPunchBtn");
-const autoPunchRolesBtn = document.getElementById("autoPunchRolesBtn");
-const autoPunchRolesDone = document.getElementById("autoPunchRolesDone");
-const autoPunchRolesStatus = document.getElementById("autoPunchRolesStatus");
 const countPill = document.getElementById("countPill");
 const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
 function isSuper(){ return (localStorage.getItem('role')||'') === 'SUPER_ADMIN'; }
-function isAdminOrSuper(){ const r=(localStorage.getItem('role')||''); return r==='SUPER_ADMIN' || r==='ADMIN'; }
-
-
-// --- Planning groupes (alternance) ---
-// Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
-const PLANNING_BASE_DATE = "2025-12-27";
-const PLANNING_BASE_GROUP = "B";
-function plannedGroupForDate(dateISO){
-  if(!dateISO) return PLANNING_BASE_GROUP;
-  const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
-  const d1 = new Date(String(dateISO) + "T00:00:00");
-  const diffDays = Math.floor((d1.getTime() - d0.getTime()) / 86400000);
-  if(diffDays % 2 === 0) return PLANNING_BASE_GROUP;
-  return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
-}
 
 function renderUserPill(){
   const el = document.getElementById("userPill");
@@ -71,7 +19,7 @@ function renderUserPill(){
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  el.innerHTML = `<span class="me-2">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
 
   // Always keep pill on the left of the first visible action button (Rapports/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
@@ -115,22 +63,12 @@ const histSubtitle = document.getElementById('histSubtitle');
 let historyModal = null;
 let currentHistVolunteer = null;
 
-// Group punch (SUPER ADMIN)
-const groupPunchModalEl = document.getElementById('groupPunchModal');
-const groupPunchRadiosEl = document.getElementById('groupPunchRadios');
-const groupPunchHintEl = document.getElementById('groupPunchHint');
-const groupPunchMsgEl = document.getElementById('groupPunchMsg');
-const groupPunchDoBtn = document.getElementById('groupPunchDoBtn');
-let groupPunchModal = null;
-let lastGroupPunchSelection = "";
-
 // Edit modal
 const editModalEl = document.getElementById("editModal");
 let editModal;
 if (editModalEl && window.bootstrap?.Modal) {
   editModal = new bootstrap.Modal(editModalEl);
   if(historyModalEl) historyModal = new bootstrap.Modal(historyModalEl);
-  if(groupPunchModalEl) groupPunchModal = new bootstrap.Modal(groupPunchModalEl);
 
   // default history dates (last 7 days)
   if(histFromEl && histToEl){
@@ -146,7 +84,7 @@ if (editModalEl && window.bootstrap?.Modal) {
     const to = histToEl.value;
     histMsg.textContent = '';
     histMsg.className = 'small mt-3';
-    histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Chargement…</td></tr>';
+    histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Chargement…</td></tr>';
     setBtnLoading(histLoadBtn, true, "Chargement...");
 
     try{
@@ -155,7 +93,7 @@ if (editModalEl && window.bootstrap?.Modal) {
         if(res.error === 'NOT_AUTHENTICATED') { logout(); return; }
         histMsg.textContent = 'Erreur: ' + (res.error||'UNKNOWN');
         histMsg.className = 'small mt-3 text-danger';
-        histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">—</td></tr>';
+        histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">—</td></tr>';
         return;
       }
       const rows = res.rows || [];
@@ -166,7 +104,7 @@ if (editModalEl && window.bootstrap?.Modal) {
         return db.localeCompare(da);
       });
       if(!rows.length){
-        histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Aucun pointage sur la période.</td></tr>';
+        histTbody.innerHTML = '<tr><td colspan="4" class="text-muted2 small">Aucun pointage sur la période.</td></tr>';
         return;
       }
       histTbody.innerHTML = rows.map(r=>{
@@ -174,6 +112,8 @@ if (editModalEl && window.bootstrap?.Modal) {
         return `<tr>`+
           `<td>${escapeHtml(r.punch_date||'')}</td>`+
           `<td>${escapeHtml(time)}</td>`+
+          `<td>${escapeHtml(r.full_name||'')}</td>`+
+          `<td>${escapeHtml(r.badge_code||'')}</td>`+
         `</tr>`;
       }).join('');
     }catch(e){
@@ -184,43 +124,6 @@ if (editModalEl && window.bootstrap?.Modal) {
     finally{ setBtnLoading(histLoadBtn, false); }
 
   });
-}
-
-function getAllGroups(){
-  // Static groups (no need to manage them in Sheets/DB)
-  return ["A","B"];
-}
-
-function renderGroupPunchRadios(selected){
-  if(!groupPunchRadiosEl) return;
-  const groups = getAllGroups();
-  if(!groups.length){
-    groupPunchRadiosEl.innerHTML = '<div class="text-muted2 small">Aucun groupe trouvé.</div>';
-    return;
-  }
-  const sel = normGroup(selected) || (normGroup(groupFilterEl?.value || "") || groups[0]);
-  lastGroupPunchSelection = sel;
-  groupPunchRadiosEl.innerHTML = groups.map(g => {
-    const id = `gp_${g}`;
-    return `
-      <label class="form-check text-white me-2">
-        <input class="form-check-input" type="radio" name="groupPunch" id="${escapeHtml(id)}" value="${escapeHtml(g)}" ${g===sel?'checked':''}>
-        <span class="form-check-label">Groupe ${escapeHtml(g)}</span>
-      </label>
-    `;
-  }).join('');
-
-  // hint + reset message
-  try{
-    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === normGroup(sel)).length;
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${sel} » : ${inGroup}. Date : ${todayISO}`;
-  }catch(e){
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Date : ${todayISO}`;
-  }
-  if(groupPunchMsgEl){
-    groupPunchMsgEl.textContent = "";
-    groupPunchMsgEl.className = "small mt-2";
-  }
 }
 const editForm = document.getElementById("editForm");
 
@@ -336,10 +239,8 @@ function setGroupRadios(prefix, group){
   const g = normGroup(group) || "A";
   const a = document.getElementById(prefix + "A");
   const b = document.getElementById(prefix + "B");
-  const c = document.getElementById(prefix + "C");
   if(a) a.checked = (g === "A");
   if(b) b.checked = (g === "B");
-  if(c) c.checked = (g === "C");
   // keep hidden inputs (for backward compatibility)
   if(prefix === "groupAdd") { if(groupEl) groupEl.value = g; }
   if(prefix === "groupEdit") { if(editGroupEl) editGroupEl.value = g; }
@@ -380,8 +281,6 @@ function refreshGroupDatalist(){
 }
 
 
-
-
 async function refreshTodayPunches(){
   const today = isoDate(new Date());
   const r = await apiReportPunches(today, today);
@@ -389,51 +288,6 @@ async function refreshTodayPunches(){
   punchedMap = new Map(((r.rows || r.punches || [])).map(p => [String(p.volunteer_id), p.punched_at]));
   return today;
 }
-
-
-function computeRolePunchStatus_(){
-  const roleVols = (volunteersCache || []).filter(v => String(v.role || "").trim() !== "");
-  const punchedIds = new Set(Array.from((punchedMap || new Map()).keys()).map(k => String(k)));
-  const pending = roleVols.filter(v => !punchedIds.has(String(v.id)));
-  return { totalRole: roleVols.length, pendingCount: pending.length };
-}
-
-
-function refreshAutoPunchRolesBtn_(){
-  if(!autoPunchRolesBtn) return;
-
-  const role = (localStorage.getItem('role')||'');
-  const canSee = (role === 'SUPER_ADMIN' || role === 'ADMIN');
-
-  if(!canSee){
-    autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
-    return;
-  }
-
-  const st = computeRolePunchStatus_();
-
-  // no role volunteers -> hide all
-  if(st.totalRole === 0){
-    autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
-    return;
-  }
-
-  // all pointed -> show green confirmation
-  if(st.pendingCount === 0){
-    autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.remove("d-none");
-    return;
-  }
-
-  // pending -> show warning button
-  if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
-  autoPunchRolesBtn.classList.remove("d-none");
-  autoPunchRolesBtn.textContent = `👑 Pointer responsables (${st.pendingCount})`;
-}
-
-
 
 function getVolunteerById(id){
   const sid = String(id);
@@ -485,11 +339,6 @@ function render(volunteers, todayISO) {
       ? `<button class="btn btn-outline-light btn-sm" data-action="edit" data-id="${escapeHtml(vid)}" title="Modifier">✏️</button>`
       : ``;
 
-    const btnDelete = isSuper()
-      ? `<button class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${escapeHtml(vid)}" title="Supprimer le bénévole">🗑️</button>`
-      : ``;
-
-
     const btnHist = `<button class="btn btn-outline-light btn-sm" data-action="history" data-id="${escapeHtml(vid)}" title="Historique">🕘</button>`;
 
     const btnUndo = punchedToday
@@ -502,10 +351,6 @@ function render(volunteers, todayISO) {
 
     const grp = normGroup(v.group || v.groupe || "");
 
-    const vRole = String(v.role || v.volunteerRole || "").trim();
-    const chefIcon = vRole ? `<span class="ms-2 chef-icon" title="Rôle: ${escapeHtml(vRole)}">⭐</span>` : ``;
-    const roleBadge = vRole ? `<span class="badge badge-soft text-white">🎖 ${escapeHtml(vRole)}</span>` : ``;
-
     const missingQr = !String(v.qrCode || "").trim();
     const qrWarn = missingQr
       ? `<span class="ms-1 text-warning qr-missing-icon" title="Ce bénévole n'a pas de QR/Code badge. Ajoutez un code pour pouvoir le scanner.">⚠️</span>`
@@ -514,18 +359,17 @@ function render(volunteers, todayISO) {
     return `
       <div class="list-card p-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
         <div class="w-100">
-          <div class="fw-bold text-truncate text-white">${escapeHtml(v.fullName || "")}${chefIcon}</div>
+          <div class="fw-bold text-truncate text-white">${escapeHtml(v.fullName || "")}</div>
           <div class="d-flex flex-wrap gap-2 mt-2">
             ${v.badgeCode ? `<span class="badge badge-soft text-white">🏷 ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷 (Sans badge)</span>`}${qrWarn}
             ${v.phone ? `<span class="badge badge-soft text-white">📞 +212 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 (Sans téléphone)</span>`}
-            ${roleBadge}
             ${grp ? `<span class="badge badge-soft text-white">👥 Groupe ${escapeHtml(grp)}</span>` : `<span class="badge badge-soft text-white">👥 Groupe (Non défini)</span>`}
             ${timeBadge}
             ${status}
           </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          ${btnEdit}${btnDelete}${btnHist}
+          ${btnEdit}${btnHist}
           ${btnUndo}
           ${btnPunch}
         </div>
@@ -549,6 +393,72 @@ function renderFromCache(){
   const filtered = filterLocal(q);
   render(filtered, todayISO);
 }
+
+// === Offline sync UI (PUNCH uniquement) ===
+async function refreshSyncUi_(){
+  try{
+    if(!window.OfflineStore) return;
+    const n = await OfflineStore.queueCount();
+    if(syncCountEl) syncCountEl.textContent = String(n);
+    if(syncBtn){
+      syncBtn.classList.toggle("d-none", n <= 0);
+      syncBtn.disabled = n <= 0;
+    }
+  }catch(e){}
+}
+
+function setOfflineFlag_(on){
+  try{
+    if(offlineStatusEl){
+      offlineStatusEl.classList.toggle("d-none", !on);
+    }
+  }catch(e){}
+}
+
+async function syncOfflineQueue_(){
+  if(!syncBtn || !window.OfflineStore) return;
+  syncBtn.disabled = true;
+  try{
+    const ops = await OfflineStore.queueList();
+    if(!ops || ops.length === 0){
+      await refreshSyncUi_();
+      return;
+    }
+    let synced = 0;
+    let already = 0;
+    const doneIds = [];
+    for(const op of ops){
+      if(op.type !== "PUNCH") continue;
+      try{
+        const res = await apiPunch(op.volunteerId, op.dateISO, "15:00"); // API already handles existing punches
+        if(res && res.ok){
+          synced++;
+          doneIds.push(op.id);
+        }else{
+          // if server says already punched, we can drop it too
+          if(res && res.code === "ALREADY_PUNCHED"){
+            already++;
+            doneIds.push(op.id);
+          }
+        }
+      }catch(e){
+        // stop early if still offline
+        setOfflineFlag_(true);
+        break;
+      }
+    }
+    if(doneIds.length){
+      await OfflineStore.queueDeleteByIds(doneIds);
+    }
+    if(synced>0 || already>0){
+      toast(`Synchronisation: ${synced} envoyés, ${already} déjà pointés.`);
+    }
+  }finally{
+    syncBtn.disabled = false;
+    await refreshSyncUi_();
+  }
+}
+
 
 async function load(forceReloadVolunteers = false, showOverlay = false) {
   const q = (searchEl.value || "").trim();
@@ -592,7 +502,6 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
 
     const filtered = filterLocal(q);
     render(filtered, todayISO);
-    refreshAutoPunchRolesBtn_();
 
   }catch(e){
     console.error(e);
@@ -609,13 +518,10 @@ function bindUI(){
   try{
     const openAddBtn = document.getElementById("openAddBtn");
     if(openAddBtn) openAddBtn.classList.toggle("d-none", !isSuper());
-  }catch(e){}
+  }catch(e){
 
   // restore group filter
-  try{
-    const g = localStorage.getItem("pointage_group_filter") || "";
-    if(groupFilterEl) groupFilterEl.value = g;
-  }catch(e){}
+  try{ const g = localStorage.getItem("pointage_group_filter") || ""; if(groupFilterEl) groupFilterEl.value = g; }catch(e){}
 }
 
 scanBtn?.addEventListener("click", ()=>{
@@ -623,119 +529,10 @@ scanBtn?.addEventListener("click", ()=>{
   location.href = "./scan.html";
 });
 
-groupPunchBtn?.addEventListener("click", async ()=>{
-  if(!isSuper()) return;
-  // ensure we have volunteers loaded at least once
-  if(!volunteersCache.length){
-    try{ await load(true, true); }catch(e){}
-  }
-  renderGroupPunchRadios(lastGroupPunchSelection);
-  groupPunchModal?.show();
-});
-
-autoPunchRolesBtn?.addEventListener("click", async ()=>{
-  const role = (localStorage.getItem('role')||'');
-  if(!(role === 'SUPER_ADMIN' || role === 'ADMIN')) return;
-
-  const st = computeRolePunchStatus_();
-  if(st.pendingCount <= 0){
-    refreshAutoPunchRolesBtn_();
-    return;
-  }
-
-  if(!confirm(`Pointer ${st.pendingCount} responsable(s) (role renseigné) ?\n\nLes bénévoles déjà pointés aujourd'hui seront ignorés.`)){
-    return;
-  }
-
-  const prevText = autoPunchRolesBtn.textContent;
-  autoPunchRolesBtn.disabled = true;
-  autoPunchRolesBtn.textContent = "⏳ Pointage en cours...";
-
-  try{
-    const today = isoDate(new Date());
-    const res = await apiRunAutoPunchRoles(today);
-
-    if(!res){
-      toast("Erreur: aucune réponse du serveur (SERVER_ERROR).");
-      return;
-    }
-    if(!res.ok){
-      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-      toast("Erreur: " + (res.error || "UNKNOWN_ACTION"));
-      return;
-    }
-
-    toast(`✅ Terminé: ${res.punchedNew || 0} ajouté(s), ${res.alreadyPunched || 0} déjà pointé(s).`);
-    
-      soundOk_();
-await load(true, true);
-  }catch(e){
-    console.error(e);
-    toast("Erreur: " + (e?.message || "JSONP error"));
-  }finally{
-    autoPunchRolesBtn.disabled = false;
-    autoPunchRolesBtn.textContent = prevText;
-    refreshAutoPunchRolesBtn_();
-  }
-});
-
-
-groupPunchRadiosEl?.addEventListener('change', ()=>{
-  const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
-  if(!selected) return;
-  lastGroupPunchSelection = selected;
-  try{
-    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === selected).length;
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${selected} » : ${inGroup}. Date : ${todayISO}`;
-  }catch(e){}
-});
-
-groupPunchDoBtn?.addEventListener('click', async ()=>{
-  if(!isSuper()) return;
-  const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
-  if(!selected){
-    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Veuillez choisir un groupe."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
-    return;
-  }
-  lastGroupPunchSelection = selected;
-  if(groupPunchMsgEl){ groupPunchMsgEl.textContent = ""; groupPunchMsgEl.className = "small mt-2"; }
-
-  setBtnLoading(groupPunchDoBtn, true, "Pointage...");
-  try{
-    const res = await apiPunchGroup(selected, todayISO);
-    if(!res.ok){
-      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-      if(groupPunchMsgEl){
-        const msg = res.error === "EMPTY_GROUP" ? "Aucun volontaire dans ce groupe." : ("Erreur: " + (res.error||"UNKNOWN"));
-        groupPunchMsgEl.textContent = msg;
-        groupPunchMsgEl.className = "small mt-2 text-danger";
-      }
-      return;
-    }
-
-    const punchedNew = Number(res.punchedNew || 0);
-    const already = Number(res.alreadyPunched || 0);
-    const total = Number(res.totalInGroup || 0);
-    if(groupPunchMsgEl){
-      groupPunchMsgEl.textContent = `✅ Terminé. Nouveaux pointages: ${punchedNew} • Déjà pointés: ${already} • Total groupe: ${total}`;
-      groupPunchMsgEl.className = "small mt-2 text-success";
-    }
-    toast(`Groupe ${selected}: +${punchedNew} pointage(s) ✅`);
-
-    // Refresh list status
-    todayISO = await refreshTodayPunches();
-    todayEl.textContent = `Aujourd'hui : ${todayISO}`;
-    renderFromCache();
-  }catch(e){
-    console.error(e);
-    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Erreur réseau."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
-  }finally{
-    setBtnLoading(groupPunchDoBtn, false);
-  }
-});
-
 refreshBtn?.addEventListener("click", () => load(true, true));
 
+syncBtn?.addEventListener("click", () => syncOfflineQueue_());
+scanBtn?.addEventListener("click", () => { location.href = "./scan.html"; });
   focusSearchBtn?.addEventListener('click', ()=>{ searchEl.focus(); searchEl.select(); });
   // mobile: focus on first tap anywhere
   let firstTapFocused=false;
@@ -745,7 +542,6 @@ refreshBtn?.addEventListener("click", () => load(true, true));
   // Actions (event delegation)
   listEl.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
-    e.preventDefault();
     if(!btn) return;
     const id = btn.dataset.id;
     const action = btn.dataset.action || btn.dataset.act;
@@ -769,19 +565,36 @@ refreshBtn?.addEventListener("click", () => load(true, true));
 
     try{
       if(action === "punch"){
-        const res = await apiPunch(id, todayISO);
+        let res = null;
+        try{
+          res = await apiPunch(id, todayISO);
+        }catch(e){
+          // hors-ligne: on met en file d\'attente
+          setOfflineFlag_(true);
+          try{
+            await OfflineStore?.enqueuePunch?.(id, todayISO, "button");
+            toast("Enregistré hors-ligne");
+            await refreshSyncUi_();
+          }catch(_e){
+            toast("Erreur réseau.");
+          }
+          // optimistic UI refresh (recharge la liste / état)
+          await load(true, true);
+          return;
+        }
+
         if(!res.ok){
           if(res.error === "ALREADY_PUNCHED"){ toast("Déjà pointé aujourd’hui."); }
           else if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
           else toast("Erreur: " + (res.error || "UNKNOWN"));
         }else{
+          setOfflineFlag_(false);
           toast("✅ Pointage enregistré");
+          await refreshSyncUi_();
         }
         todayISO = await refreshTodayPunches();
         todayEl.textContent = `Aujourd'hui : ${todayISO}`;
         renderFromCache();
-        // ensure UI interaction remains responsive after re-render
-        await new Promise(r=>setTimeout(r,0));
       }
 
       if(action === "undo"){
@@ -795,22 +608,6 @@ refreshBtn?.addEventListener("click", () => load(true, true));
         todayISO = await refreshTodayPunches();
         todayEl.textContent = `Aujourd'hui : ${todayISO}`;
         renderFromCache();
-      }
-
-      if(action === "delete"){
-        if(!isSuper()) return;
-        const v = getVolunteerById(id);
-        const label = v ? `${v.fullName || ""} (${v.badgeCode || ""})` : id;
-        if(!confirm(`Supprimer ce bénévole ?\n\n${label}\n\n⚠️ Les pointages (historique) ne seront pas supprimés.`)) return;
-        const res = await apiDeleteVolunteer(id);
-        if(!res.ok){
-          if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-          toast("Erreur: " + (res.error || "UNKNOWN"));
-        }else{
-          toast("✅ Bénévole supprimé");
-          // Reload volunteers from backend then refresh UI
-          await load(true, true);
-        }
       }
 
       if(action === "edit"){
@@ -830,11 +627,8 @@ refreshBtn?.addEventListener("click", () => load(true, true));
       console.error(err);
       toast("Erreur inattendue.");
     }finally{
-      try{ btn.blur && btn.blur(); }catch(e){}
-      if(btn && btn.isConnected){
-        btn.disabled = false;
-        btn.innerHTML = old;
-      }
+      btn.disabled = false;
+      btn.innerHTML = old;
     }
   });
 
@@ -858,11 +652,6 @@ logoutBtn?.addEventListener("click", logout);
     addMsg.className = "small";
     setGroupRadios("groupAdd", "A");
     if(qrCodeEl) qrCodeEl.value = "";
-    // Default: ne pas pointer immédiatement
-    try{
-      const r = document.querySelector('input[name="punchNowAdd"][value="no"]');
-      if(r) r.checked = true;
-    }catch(e){}
     addModal?.show();
   });
 
@@ -879,7 +668,6 @@ logoutBtn?.addEventListener("click", logout);
     const qrCode = (qrCodeEl ? (qrCodeEl.value || "") : "").trim();
     const phone = (phoneEl.value || "").trim();
     const group = getSelectedGroupAdd();
-    const punchNow = (document.querySelector('input[name="punchNowAdd"]:checked')?.value === "yes");
     if(groupEl) groupEl.value = group;
     if(!fullName){
       setInlineSpinner(addSpinnerEl, false);
@@ -915,42 +703,15 @@ logoutBtn?.addEventListener("click", logout);
       });
       writeLocalCache(volunteersCache);
 
-      // Optional: punch immediately after adding
-      let punchMsg = "";
-      if(punchNow){
-        try{
-          const punchRes = await apiPunch(res.id, todayISO || isoDate(new Date()));
-          if(!punchRes.ok){
-            if(punchRes.error === "ALREADY_PUNCHED"){
-              // include time if provided
-              const t = punchRes.punchedAt ? formatTimeLocal(punchRes.punchedAt) : "";
-              punchMsg = t ? ` (déjà pointé à ${t})` : " (déjà pointé)";
-            }else{
-              punchMsg = ` (pointage non enregistré: ${punchRes.error || "UNKNOWN"})`;
-            }
-          }else{
-            punchMsg = " (pointé aujourd’hui ✅)";
-          }
-        }catch(e){
-          punchMsg = " (pointage non enregistré: erreur réseau)";
-        }
-      }
-
-      addMsg.textContent = "✅ Volontaire ajouté" + punchMsg;
-      addMsg.className = punchNow ? "small text-success" : "small text-success";
+      addMsg.textContent = "✅ Volontaire ajouté";
+      addMsg.className = "small text-success";
       setInlineSpinner(addSpinnerEl, false);
       fullNameEl.value = "";
       badgeCodeEl.value = "";
       if(qrCodeEl) qrCodeEl.value = "";
       phoneEl.value = "";
 
-      // Refresh punches so the list shows the correct status
-      try{
-        todayISO = await refreshTodayPunches();
-        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
-      }catch(e){}
-
-      setTimeout(()=> addModal?.hide(), 600);
+      setTimeout(()=> addModal?.hide(), 500);
       renderFromCache();
 
     }catch(err){
@@ -1037,38 +798,15 @@ logoutBtn?.addEventListener("click", logout);
       setBtnLoading(submitBtn, false);
     }
   });
+
+}
+
 function applyRoleUI(){
   const superOnly = document.querySelectorAll('[data-super-only]');
   superOnly.forEach(el => { el.style.display = isSuper() ? '' : 'none'; });
-
-  const adminOnly = document.querySelectorAll('[data-admin-only]');
-  adminOnly.forEach(el => { el.style.display = isAdminOrSuper() ? '' : 'none'; });
 }
-
-function applyPlanningUI(){
-  try{
-    const todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0,10);
-    const workG = plannedGroupForDate(todayISO);
-
-    // default group filter = groupe actif du jour (si pas déjà choisi)
-    if(groupFilterEl && !groupFilterEl.value){
-      groupFilterEl.value = workG;
-    }
-
-    // title
-    const titleEl = document.getElementById("pageTitle");
-    if(titleEl){
-      titleEl.textContent = `Volontaires Groupe ${workG} : 15h - 19h`;
-    }
-  }catch(e){
-    console.warn("applyPlanningUI", e);
-  }
-}
-
-
 
 requireAdmin();
 bindUI();
 applyRoleUI();
-applyPlanningUI();
 load(true, true);

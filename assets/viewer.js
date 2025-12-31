@@ -1,5 +1,5 @@
 /* Viewer page (no login) */
-(function () {
+(function(){
   const qName = document.getElementById("qName");
   const qBadge = document.getElementById("qBadge");
   const qGroup = document.getElementById("qGroup");
@@ -24,23 +24,23 @@
   let volunteers = [];
   let currentVolunteer = null;
 
-  function escapeHtml(s) {
+  function escapeHtml(s){
     return String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  function normGroup(g) { return String(g ?? "").trim().toUpperCase(); }
+  function normGroup(g){ return String(g ?? "").trim().toUpperCase(); }
 
-  function showLoader(on) {
-    if (!loaderEl) return;
+  function showLoader(on){
+    if(!loaderEl) return;
     loaderEl.classList.toggle("d-none", !on);
   }
 
-  function renderList() {
+  function renderList(){
     const nameQ = (qName?.value || "").trim().toLowerCase();
     const badgeQ = (qBadge?.value || "").trim().toLowerCase();
     const groupQ = normGroup(qGroup?.value || "");
@@ -50,9 +50,9 @@
       const bc = (v.badgeCode || "").toLowerCase();
       const g = normGroup(v.group || v.groupe);
 
-      if (nameQ && !fn.includes(nameQ)) return false;
-      if (badgeQ && !bc.includes(badgeQ)) return false;
-      if (groupQ && g !== groupQ) return false;
+      if(nameQ && !fn.includes(nameQ)) return false;
+      if(badgeQ && !bc.includes(badgeQ)) return false;
+      if(groupQ && g !== groupQ) return false;
       return true;
     });
 
@@ -61,7 +61,8 @@
 
     listEl.innerHTML = filtered.map(v => {
       const g = normGroup(v.group || v.groupe);
-      const gBadge = g ? `<span class="badge badge-soft text-white">👥 Groupe  ${escapeHtml(g)}</span>` : `<span class="badge badge-soft text-white">👥 —</span>`;
+      const gBadge = g ? `<span class="badge badge-soft text-white">👥 ${escapeHtml(g)}</span>` : `<span class="badge badge-soft text-white">👥 —</span>`;
+      const phone = v.phone ? `<span class="badge badge-soft text-white">📞 ${escapeHtml(v.phone)}</span>` : `<span class="badge badge-soft text-white">📞 —</span>`;
       const badge = v.badgeCode ? `<span class="badge badge-soft text-white">🏷️ ${escapeHtml(v.badgeCode)}</span>` : `<span class="badge badge-soft text-white">🏷️ —</span>`;
 
       return `
@@ -74,6 +75,7 @@
               </div>
               <div class="d-flex flex-wrap gap-2 mt-2">
                 ${badge}
+                ${phone}
                 ${gBadge}
               </div>
             </div>
@@ -83,28 +85,20 @@
     }).join("");
   }
 
-  function openModal() {
+  function openModal(){
     modalEl?.classList.remove("d-none");
   }
-  function closeModal() {
+  function closeModal(){
     modalEl?.classList.add("d-none");
     currentVolunteer = null;
   }
 
-  function todayInputValue() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`; // format ديال <input type="date">
-  }
-
-  async function loadHistory() {
-    if (!currentVolunteer) return;
+  async function loadHistory(){
+    if(!currentVolunteer) return;
     let from = histFrom.value;
     let to = histTo.value;
-    if (!to) to = todayInputValue();
-    if (!from) from = to;
+    if(!to) to = "2025-12-25";
+    if(!from) from = to;
     histFrom.value = from;
     histTo.value = to;
 
@@ -113,9 +107,9 @@
     histTbody.innerHTML = `<tr><td colspan="3" class="text-muted2 small">Chargement…</td></tr>`;
     histCount.textContent = "0";
 
-    try {
+    try{
       const res = await apiPublicVolunteerHistory(currentVolunteer.id, from, to);
-      if (!res.ok) {
+      if(!res.ok){
         histMsg.textContent = "Erreur: " + (res.error || "UNKNOWN");
         histMsg.className = "small text-danger";
         histTbody.innerHTML = "";
@@ -124,27 +118,28 @@
 
       const rows = (res.rows || []).slice();
       // newest first
-      rows.sort((a, b) => {
-        if (a.punch_date !== b.punch_date) return String(b.punch_date || "").localeCompare(String(a.punch_date || ""));
-        return String(b.punched_at || "").localeCompare(String(a.punched_at || ""));
+      rows.sort((a,b)=> {
+        if(a.punch_date !== b.punch_date) return String(b.punch_date||"").localeCompare(String(a.punch_date||""));
+        return String(b.punched_at||"").localeCompare(String(a.punched_at||""));
       });
 
       histCount.textContent = String(rows.length);
-      if (!rows.length) {
+      if(!rows.length){
         histTbody.innerHTML = `<tr><td colspan="3" class="text-muted2 small">Aucun pointage sur cette période.</td></tr>`;
         return;
       }
 
       histTbody.innerHTML = rows.map(r => {
-        const time = r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+        const time = r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
         return `
           <tr>
             <td class="fw-bold">${escapeHtml(r.punch_date || "")}</td>
             <td>${escapeHtml(time)}</td>
+            <td>${escapeHtml(r.badge_code || "")}</td>
           </tr>
         `;
       }).join("");
-    } catch (err) {
+    }catch(err){
       console.error(err);
       histMsg.textContent = "Impossible de charger l'historique.";
       histMsg.className = "small text-danger";
@@ -152,46 +147,46 @@
     }
   }
 
-  async function init() {
+  async function init(){
     // default dates (30 days)
-    histTo.value = todayInputValue();
-    histFrom.value = "2025-12-22";
+    histTo.value = "2025-12-25";
+    histFrom.value = "2025-11-25";
 
     bind();
     showLoader(true);
-    try {
+    try{
       const res = await apiPublicListVolunteers("");
-      if (!res.ok) {
+      if(!res.ok){
         throw new Error(res.error || "API_ERROR");
       }
-      volunteers = (res.volunteers || []).map(v => ({ ...v, group: normGroup(v.group || v.groupe) }));
+      volunteers = (res.volunteers || []).map(v => ({...v, group: normGroup(v.group || v.groupe)}));
       renderList();
-    } catch (err) {
+    }catch(err){
       console.error(err);
       emptyStateEl.classList.remove("d-none");
-      emptyStateEl.textContent = "Impossible de charger les bénévoles. " + (err && err.message ? ("Détail: " + err.message) : "(Backend non à jour ou configuration API_URL).");
-    } finally {
+      emptyStateEl.textContent = "Impossible de charger les bénévoles. Vérifiez la configuration API_URL/TOKEN.";
+    }finally{
       showLoader(false);
     }
   }
 
-  function bind() {
+  function bind(){
     qName?.addEventListener("input", renderList);
     qBadge?.addEventListener("input", renderList);
     qGroup?.addEventListener("change", renderList);
 
-    listEl?.addEventListener("click", (e) => {
+    listEl?.addEventListener("click", (e)=>{
       const btn = e.target.closest('[data-action="history"]');
-      if (!btn) return;
+      if(!btn) return;
       const id = btn.getAttribute("data-id");
       const v = volunteers.find(x => String(x.id) === String(id));
-      if (!v) return;
+      if(!v) return;
       currentVolunteer = v;
       histTitle.textContent = "Historique";
       histSub.textContent = `${v.fullName || ""} • Badge: ${v.badgeCode || "—"} • Groupe: ${normGroup(v.group) || "—"}`;
       // Default date range (required by API)
-      if (!histTo.value) histTo.value = todayInputValue();
-      if (!histFrom.value) histFrom.value = histTo.value;
+      if(!histTo.value) histTo.value = "2025-12-25";
+      if(!histFrom.value) histFrom.value = histTo.value;
 
       openModal();
       loadHistory();
@@ -202,8 +197,8 @@
     closeBtn?.addEventListener("click", closeModal);
     closeBtn2?.addEventListener("click", closeModal);
     modalBackdrop?.addEventListener("click", closeModal);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && modalEl && !modalEl.classList.contains("d-none")) closeModal();
+    document.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape" && modalEl && !modalEl.classList.contains("d-none")) closeModal();
     });
   }
 
