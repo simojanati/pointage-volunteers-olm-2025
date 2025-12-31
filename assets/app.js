@@ -1,3 +1,39 @@
+
+
+// === Sound helpers (WebAudio) ===
+let __audioCtx = null;
+function ensureAudioCtx_(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!__audioCtx) __audioCtx = new AC();
+  try{ if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{}); }catch(e){}
+  return __audioCtx;
+}
+function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
+  const ctx = ensureAudioCtx_();
+  if(!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g); g.connect(ctx.destination);
+  const t = ctx.currentTime;
+  o.start(t);
+  try{
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + durSec);
+  }catch(e){}
+  o.stop(t + durSec);
+}
+function soundOk_(){
+  beep_(880, 0.10, 0.20, "sine");
+  setTimeout(()=>beep_(1175, 0.08, 0.16, "sine"), 120);
+  try{ navigator.vibrate && navigator.vibrate(40); }catch(e){}
+}
+// Prime audio context on first user interaction
+document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
+
 const listEl = document.getElementById("list");
 const searchEl = document.getElementById("search");
 const groupFilterEl = document.getElementById("groupFilter");
@@ -630,7 +666,9 @@ autoPunchRolesBtn?.addEventListener("click", async ()=>{
     }
 
     toast(`✅ Terminé: ${res.punchedNew || 0} ajouté(s), ${res.alreadyPunched || 0} déjà pointé(s).`);
-    await load(true, true);
+    
+      soundOk_();
+await load(true, true);
   }catch(e){
     console.error(e);
     toast("Erreur: " + (e?.message || "JSONP error"));

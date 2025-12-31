@@ -364,12 +364,10 @@ async function processCode(rawCode, source='scan'){
   try{
     const res = await apiPunch(v.id, today);
     if(res?.ok){
-      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
-      toast('✅ Pointage enregistré');
-      
+      // Succès: son + image uniquement (pas de message texte)
       __beepScanOk_();
       __showScanSuccessOverlay_();
-return;
+      return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
       const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
