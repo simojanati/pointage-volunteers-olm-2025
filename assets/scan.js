@@ -216,8 +216,11 @@ async function punchVolunteerAfterAssign(v, rawCode) {
     if (res?.error === 'ALREADY_PUNCHED') {
       const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
       const at = t ? ` à <b>${escapeHtml(t)}</b>` : '';
+      // Same feedback as offline "déjà pointé"
+      soundErr_();
       setStatus(`❌ <b>${escapeHtml(v.fullName || '')}</b> est déjà pointé aujourd’hui${at}.`, 'danger');
       toast('Déjà pointé');
+      __showScanSuccessOverlay_('Déjà pointé');
       return;
     }
     if (res?.error === 'NOT_AUTHENTICATED') {
@@ -524,7 +527,14 @@ function __ensureScanSuccessOverlay_() {
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
   const img = document.createElement('img');
-  img.src = './assets/qr-code-succes.png';
+  // Same visual feedback in online/offline. Use a resilient path + fallback.
+  img.src = 'assets/qr-code-succes.png';
+  img.onerror = () => {
+    try {
+      img.onerror = null;
+      img.src = 'assets/sucess.png';
+    } catch (e) { }
+  };
   img.alt = 'Succès';
   img.style.cssText = 'max-width:220px;width:60vw;height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.55));';
   const cap = document.createElement('div');
@@ -771,8 +781,10 @@ async function processCode(rawCode, source = 'scan') {
     if (res?.error === 'ALREADY_PUNCHED') {
       const t = res?.punchedAt ? formatTimeLocal(res.punchedAt) : '';
       const at = t ? ` à <b>${escapeHtml(t)}</b>` : '';
+      soundErr_();
       setStatus(`❌ <b>${escapeHtml(v.fullName || '')}</b> est déjà pointé aujourd’hui${at}.`, 'danger');
       toast('Déjà pointé');
+      __showScanSuccessOverlay_('Déjà pointé');
       return;
     }
     if (res?.error === 'NOT_AUTHENTICATED') {
