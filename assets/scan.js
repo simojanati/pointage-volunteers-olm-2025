@@ -519,6 +519,37 @@ async function loadVolunteers() {
 let __scanSuccessOverlayEl = null;
 let __scanSuccessHideTimer = null;
 
+// Inline SVG icons (work fully offline, no HTTP/cache needed)
+function __svgDataUri_(svg) {
+  try {
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(String(svg || '').trim());
+  } catch (e) {
+    return '';
+  }
+}
+
+const __ICON_OK_URI_ = __svgDataUri_(`
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <circle cx="128" cy="128" r="92" fill="#22c55e" filter="url(#ds)"/>
+  <path d="M92 132.5l20.5 20.5L166 99.5" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`);
+
+const __ICON_ALREADY_URI_ = __svgDataUri_(`
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <circle cx="128" cy="128" r="92" fill="#ef4444" filter="url(#ds)"/>
+  <path d="M96 96l64 64M160 96l-64 64" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+</svg>`);
+
 function __ensureScanSuccessOverlay_() {
   if (__scanSuccessOverlayEl) return __scanSuccessOverlayEl;
   const ov = document.createElement('div');
@@ -527,12 +558,13 @@ function __ensureScanSuccessOverlay_() {
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
   const img = document.createElement('img');
-  // Same visual feedback in online/offline. Use a resilient path + fallback.
-  img.src = 'assets/qr-code-succes.png';
+  img.id = 'scanSuccessOverlayImg';
+  // Works fully offline (inline SVG). Fallback to local assets if needed.
+  img.src = __ICON_OK_URI_ || './assets/qr-code-succes.png';
   img.onerror = () => {
     try {
       img.onerror = null;
-      img.src = 'assets/sucess.png';
+      img.src = './assets/sucess.png';
     } catch (e) { }
   };
   img.alt = 'Succès';
@@ -551,8 +583,18 @@ function __ensureScanSuccessOverlay_() {
 function __showScanSuccessOverlay_(caption) {
   const ov = __ensureScanSuccessOverlay_();
   const cap = ov.querySelector('#scanSuccessOverlayCaption');
+  const img = ov.querySelector('#scanSuccessOverlayImg');
   try {
     const txt = caption ? String(caption) : '';
+
+    // Switch image for "Déjà pointé" (offline/online)
+    if (img) {
+      const isAlready = /d[ée]j[aà]\s+point[ée]/i.test(txt);
+      const wanted = isAlready ? (__ICON_ALREADY_URI_ || './assets/sucess.png') : (__ICON_OK_URI_ || './assets/qr-code-succes.png');
+      if (img.getAttribute('src') !== wanted) img.setAttribute('src', wanted);
+      img.alt = isAlready ? 'Déjà pointé' : 'Succès';
+    }
+
     if (cap) {
       cap.textContent = txt;
       cap.style.display = txt ? 'block' : 'none';
