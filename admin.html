@@ -26,9 +26,9 @@
 
       <div id="navActions" class="d-flex align-items-center gap-2 ms-auto justify-content-end flex-nowrap">
         <a class="btn btn-outline-light btn-sm" href="./reports.html" data-super-only>Rapports</a>
-<span id="userPill" class="user-pill">
+        <span id="userPill" class="user-pill">
           <span id="netDot" class="net-dot net-unknown" title="Connexion"></span>
-          
+
         </span>
         <button id="logoutBtn" class="btn btn-outline-light btn-sm">Déconnexion</button>
       </div>
@@ -46,11 +46,19 @@
           <div id="adminActions" class="d-flex align-items-center gap-2 flex-wrap">
             <span class="badge badge-soft text-white" id="countPill">0</span>
             <button id="scanBtn" class="btn btn-outline-light btn-sm">📷 Scanner</button>
-            <button id="groupPunchBtn" class="btn btn-outline-light btn-sm" data-super-only>👥 Pointage par groupe</button>
-            <button id="autoPunchRolesBtn" class="btn btn-warning btn-sm d-none" data-admin-only title="Pointer automatiquement les responsables (role renseigné) à 15h — ignore ceux déjà pointés">👑 Pointer responsables</button>
-            <span id="autoPunchRolesDone" class="badge bg-success d-none" title="Tous les responsables sont pointés pour aujourd\'hui">✅ Responsables pointés</span>
-            <span id="autoPunchRolesStatus" class="ms-2 d-none text-success fw-semibold"><span class="me-1">✅</span>Responsables pointés</span>
-            <button id="syncBtn" class="btn btn-warning btn-sm d-none">🔄 Synchroniser (<span id="syncCount">0</span>)</button>
+            <button id="groupPunchBtn" class="btn btn-outline-light btn-sm" data-super-only>👥 Pointage par
+              groupe</button>
+            <button id="autoPunchRolesBtn" class="btn btn-warning btn-sm d-none" data-admin-only
+              title="Pointer automatiquement les responsables (role renseigné) à 15h — ignore ceux déjà pointés">👑
+              Pointer responsables</button>
+            <span id="autoPunchRolesDone" class="badge bg-success d-none"
+              title="Tous les responsables sont pointés pour aujourd\'hui">✅ Responsables pointés</span>
+            <span id="autoPunchRolesStatus" class="ms-2 d-none text-success fw-semibold"><span
+                class="me-1">✅</span>Responsables pointés</span>
+            <button id="syncBtn" class="btn btn-warning btn-sm d-none">
+              🔄 Synchroniser (<span id="syncCount">0</span>)
+              <span id="syncSpinner" class="btn-spinner d-none" aria-hidden="true"></span>
+            </button>
             <button id="refreshBtn" class="btn btn-outline-light btn-sm">Actualiser</button>
           </div>
         </div>
@@ -65,7 +73,8 @@
             <select id="groupFilter" class="form-select bg-dark text-white border-0">
               <option value="">Tous les groupes</option>
               <option value="A">Groupe A</option>
-              <option value="B">Groupe B</option>            </select>
+              <option value="B">Groupe B</option>
+            </select>
           </div>
 
           <div class="col-3 col-md-2 d-grid">
@@ -153,7 +162,8 @@
         <div class="modal-header">
           <div>
             <h5 class="modal-title mb-0">Pointage par groupe</h5>
-            <div class="small text-muted2">Sélectionnez un groupe puis pointez tous les volontaires du groupe en une seule fois.</div>
+            <div class="small text-muted2">Sélectionnez un groupe puis pointez tous les volontaires du groupe en une
+              seule fois.</div>
           </div>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
@@ -202,7 +212,8 @@
             </div>
             <div>
               <label class="form-label small text-muted2 mb-1">Code QR</label>
-              <input id="qrCode" class="form-control bg-black text-white border-0" placeholder="Coller le code scanné..." />
+              <input id="qrCode" class="form-control bg-black text-white border-0"
+                placeholder="Coller le code scanné..." />
               <div class="form-text text-muted2">Optionnel (unique)</div>
             </div>
             <div>
@@ -222,7 +233,7 @@
                   <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
                   <span class="form-check-label">B</span>
                 </label>
-                <label class="form-check text-white">                </label>
+                <label class="form-check text-white"> </label>
               </div>
               <input type="hidden" id="group" value="A">
             </div>
@@ -239,7 +250,8 @@
                   <span class="form-check-label">Oui</span>
                 </label>
               </div>
-              <div class="form-text text-muted2">Si «&nbsp;Oui&nbsp;», le pointage du jour sera enregistré automatiquement après l'ajout.</div>
+              <div class="form-text text-muted2">Si «&nbsp;Oui&nbsp;», le pointage du jour sera enregistré
+                automatiquement après l'ajout.</div>
             </div>
         </div>
 
@@ -300,7 +312,7 @@
                   <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
                   <span class="form-check-label">B</span>
                 </label>
-                <label class="form-check text-white">                </label>
+                <label class="form-check text-white"> </label>
               </div>
               <input type="hidden" id="editGroup" value="A">
             </div>

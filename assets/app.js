@@ -2,18 +2,18 @@
 
 // === Sound helpers (WebAudio) ===
 let __audioCtx = null;
-function ensureAudioCtx_(){
+function ensureAudioCtx_() {
   const AC = window.AudioContext || window.webkitAudioContext;
-  if(!AC) return null;
-  if(!__audioCtx) __audioCtx = new AC();
-  try{
-    if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{});
-  }catch(e){}
+  if (!AC) return null;
+  if (!__audioCtx) __audioCtx = new AC();
+  try {
+    if (__audioCtx.state === "suspended") __audioCtx.resume().catch(() => { });
+  } catch (e) { }
   return __audioCtx;
 }
-function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
+function beep_(freq = 880, durSec = 0.12, vol = 0.18, type = "sine") {
   const ctx = ensureAudioCtx_();
-  if(!ctx) return;
+  if (!ctx) return;
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.type = type;
@@ -23,23 +23,23 @@ function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
   g.connect(ctx.destination);
   const t = ctx.currentTime;
   o.start(t);
-  try{
+  try {
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + durSec);
-  }catch(e){}
+  } catch (e) { }
   o.stop(t + durSec);
 }
-function soundOk_(){
+function soundOk_() {
   beep_(880, 0.10, 0.22, "sine");
-  setTimeout(()=>beep_(1175, 0.08, 0.18, "sine"), 120);
-  try{ navigator.vibrate && navigator.vibrate(40); }catch(e){}
+  setTimeout(() => beep_(1175, 0.08, 0.18, "sine"), 120);
+  try { navigator.vibrate && navigator.vibrate(40); } catch (e) { }
 }
-function soundErr_(){
+function soundErr_() {
   beep_(220, 0.14, 0.20, "square");
-  try{ navigator.vibrate && navigator.vibrate([30,30,30]); }catch(e){}
+  try { navigator.vibrate && navigator.vibrate([30, 30, 30]); } catch (e) { }
 }
 // Prime audio context on first user interaction (important on mobile)
-document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
+document.addEventListener("pointerdown", () => { ensureAudioCtx_(); }, { once: true });
 
 const listEl = document.getElementById("list");
 const searchEl = document.getElementById("search");
@@ -56,31 +56,31 @@ const autoPunchRolesStatus = document.getElementById("autoPunchRolesStatus");
 const countPill = document.getElementById("countPill");
 const todayEl = document.getElementById("today");
 const toastEl = document.getElementById("toast");
-function isSuper(){ return (localStorage.getItem('role')||'') === 'SUPER_ADMIN'; }
-function isAdminOrSuper(){ const r=(localStorage.getItem('role')||''); return r==='SUPER_ADMIN' || r==='ADMIN'; }
+function isSuper() { return (localStorage.getItem('role') || '') === 'SUPER_ADMIN'; }
+function isAdminOrSuper() { const r = (localStorage.getItem('role') || ''); return r === 'SUPER_ADMIN' || r === 'ADMIN'; }
 
 
 // --- Planning groupes (alternance) ---
 // Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
 const PLANNING_BASE_DATE = "2025-12-27";
 const PLANNING_BASE_GROUP = "B";
-function plannedGroupForDate(dateISO){
-  if(!dateISO) return PLANNING_BASE_GROUP;
+function plannedGroupForDate(dateISO) {
+  if (!dateISO) return PLANNING_BASE_GROUP;
   const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
   const d1 = new Date(String(dateISO) + "T00:00:00");
   const diffDays = Math.floor((d1.getTime() - d0.getTime()) / 86400000);
-  if(diffDays % 2 === 0) return PLANNING_BASE_GROUP;
+  if (diffDays % 2 === 0) return PLANNING_BASE_GROUP;
   return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
 }
 
 
-function renderUserPill(){
+function renderUserPill() {
   const el = document.getElementById("userPill");
-  if(!el) return;
+  if (!el) return;
 
   // Ensure netDot exists inside the pill (left)
   let dot = el.querySelector("#netDot");
-  if(!dot){
+  if (!dot) {
     dot = document.createElement("span");
     dot.id = "netDot";
     dot.className = "net-dot net-unknown";
@@ -94,7 +94,7 @@ function renderUserPill(){
 
   // Remove everything except dot
   Array.from(el.childNodes).forEach(n => {
-    if(n !== dot) el.removeChild(n);
+    if (n !== dot) el.removeChild(n);
   });
 
   const nameSpan = document.createElement("span");
@@ -110,17 +110,17 @@ function renderUserPill(){
 
   // Always keep pill on the left of the first visible action button (Rapports/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
-  if(!actions) return;
+  if (!actions) return;
 
   const candidates = Array.from(actions.querySelectorAll("a,button"))
     .filter(x => x.id !== "userPill" && x.offsetParent !== null);
 
   const first = candidates[0];
-  try{
-    if(first){
+  try {
+    if (first) {
       actions.insertBefore(el, first);
     }
-  }catch(e){}
+  } catch (e) { }
 }
 
 
@@ -165,19 +165,19 @@ const editModalEl = document.getElementById("editModal");
 let editModal;
 if (editModalEl && window.bootstrap?.Modal) {
   editModal = new bootstrap.Modal(editModalEl);
-  if(historyModalEl) historyModal = new bootstrap.Modal(historyModalEl);
-  if(groupPunchModalEl) groupPunchModal = new bootstrap.Modal(groupPunchModalEl);
+  if (historyModalEl) historyModal = new bootstrap.Modal(historyModalEl);
+  if (groupPunchModalEl) groupPunchModal = new bootstrap.Modal(groupPunchModalEl);
 
   // default history dates (last 7 days)
-  if(histFromEl && histToEl){
+  if (histFromEl && histToEl) {
     const today = isoDate(new Date());
-    const d = new Date(); d.setDate(d.getDate()-7);
+    const d = new Date(); d.setDate(d.getDate() - 7);
     histFromEl.value = isoDate(d);
     histToEl.value = today;
   }
 
-  histLoadBtn?.addEventListener('click', async ()=>{
-    if(!currentHistVolunteer){ return; }
+  histLoadBtn?.addEventListener('click', async () => {
+    if (!currentHistVolunteer) { return; }
     const from = histFromEl.value;
     const to = histToEl.value;
     histMsg.textContent = '';
@@ -185,52 +185,52 @@ if (editModalEl && window.bootstrap?.Modal) {
     histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Chargement…</td></tr>';
     setBtnLoading(histLoadBtn, true, "Chargement...");
 
-    try{
+    try {
       const res = await apiVolunteerHistory(currentHistVolunteer.id, from, to);
-      if(!res.ok){
-        if(res.error === 'NOT_AUTHENTICATED') { logout(); return; }
-        histMsg.textContent = 'Erreur: ' + (res.error||'UNKNOWN');
+      if (!res.ok) {
+        if (res.error === 'NOT_AUTHENTICATED') { logout(); return; }
+        histMsg.textContent = 'Erreur: ' + (res.error || 'UNKNOWN');
         histMsg.className = 'small mt-3 text-danger';
         histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">—</td></tr>';
         return;
       }
       const rows = res.rows || [];
       // Trier: plus récent en premier
-      rows.sort((a,b)=>{
-        const da = String(a.punch_date||"") + " " + String(a.punched_at||"");
-        const db = String(b.punch_date||"") + " " + String(b.punched_at||"");
+      rows.sort((a, b) => {
+        const da = String(a.punch_date || "") + " " + String(a.punched_at || "");
+        const db = String(b.punch_date || "") + " " + String(b.punched_at || "");
         return db.localeCompare(da);
       });
-      if(!rows.length){
+      if (!rows.length) {
         histTbody.innerHTML = '<tr><td colspan="2" class="text-muted2 small">Aucun pointage sur la période.</td></tr>';
         return;
       }
-      histTbody.innerHTML = rows.map(r=>{
-        const time = r.punched_at ? new Date(r.punched_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-        return `<tr>`+
-          `<td>${escapeHtml(r.punch_date||'')}</td>`+
-          `<td>${escapeHtml(time)}</td>`+
-        `</tr>`;
+      histTbody.innerHTML = rows.map(r => {
+        const time = r.punched_at ? new Date(r.punched_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+        return `<tr>` +
+          `<td>${escapeHtml(r.punch_date || '')}</td>` +
+          `<td>${escapeHtml(time)}</td>` +
+          `</tr>`;
       }).join('');
-    }catch(e){
+    } catch (e) {
       console.error(e);
       histMsg.textContent = 'Erreur API.';
       histMsg.className = 'small mt-3 text-danger';
     }
-    finally{ setBtnLoading(histLoadBtn, false); }
+    finally { setBtnLoading(histLoadBtn, false); }
 
   });
 }
 
-function getAllGroups(){
+function getAllGroups() {
   // Static groups (no need to manage them in Sheets/DB)
-  return ["A","B"];
+  return ["A", "B"];
 }
 
-function renderGroupPunchRadios(selected){
-  if(!groupPunchRadiosEl) return;
+function renderGroupPunchRadios(selected) {
+  if (!groupPunchRadiosEl) return;
   const groups = getAllGroups();
-  if(!groups.length){
+  if (!groups.length) {
     groupPunchRadiosEl.innerHTML = '<div class="text-muted2 small">Aucun groupe trouvé.</div>';
     return;
   }
@@ -240,20 +240,20 @@ function renderGroupPunchRadios(selected){
     const id = `gp_${g}`;
     return `
       <label class="form-check text-white me-2">
-        <input class="form-check-input" type="radio" name="groupPunch" id="${escapeHtml(id)}" value="${escapeHtml(g)}" ${g===sel?'checked':''}>
+        <input class="form-check-input" type="radio" name="groupPunch" id="${escapeHtml(id)}" value="${escapeHtml(g)}" ${g === sel ? 'checked' : ''}>
         <span class="form-check-label">Groupe ${escapeHtml(g)}</span>
       </label>
     `;
   }).join('');
 
   // hint + reset message
-  try{
-    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === normGroup(sel)).length;
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${sel} » : ${inGroup}. Date : ${todayISO}`;
-  }catch(e){
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Date : ${todayISO}`;
+  try {
+    const inGroup = (volunteersCache || []).filter(v => normGroup(v.group || v.groupe) === normGroup(sel)).length;
+    if (groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${sel} » : ${inGroup}. Date : ${todayISO}`;
+  } catch (e) {
+    if (groupPunchHintEl) groupPunchHintEl.textContent = `Date : ${todayISO}`;
   }
-  if(groupPunchMsgEl){
+  if (groupPunchMsgEl) {
     groupPunchMsgEl.textContent = "";
     groupPunchMsgEl.className = "small mt-2";
   }
@@ -279,8 +279,8 @@ const groupDatalistEl = document.getElementById("groupDatalist");
 
 let punchedMap = new Map();
 
-let todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0,10);
-     // volunteer_id -> punched_at
+let todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0, 10);
+// volunteer_id -> punched_at
 let volunteersCache = [];       // cached volunteers
 let lastLoadedAt = 0;
 
@@ -294,33 +294,33 @@ function toast(msg) {
   setTimeout(() => (toastEl.style.opacity = "0"), 2200);
 }
 
-function showLoader(text="Chargement..."){
-  if(!pageLoaderEl) return;
-  if(loaderTextEl) loaderTextEl.textContent = text;
+function showLoader(text = "Chargement...") {
+  if (!pageLoaderEl) return;
+  if (loaderTextEl) loaderTextEl.textContent = text;
   pageLoaderEl.style.display = "flex";
 }
-function hideLoader(){
-  if(!pageLoaderEl) return;
+function hideLoader() {
+  if (!pageLoaderEl) return;
   pageLoaderEl.style.display = "none";
 }
 
-function resetBtn(btn, label){
-  if(!btn) return;
+function resetBtn(btn, label) {
+  if (!btn) return;
   btn.disabled = false;
   btn.innerHTML = label || btn.textContent || "OK";
-  if(btn.dataset && btn.dataset._oldHtml) delete btn.dataset._oldHtml;
+  if (btn.dataset && btn.dataset._oldHtml) delete btn.dataset._oldHtml;
 }
 
-function setBtnLoading(btn, loading, label){
-  if(!btn) return;
-  if(loading){
-    if(!btn.dataset._oldHtml) btn.dataset._oldHtml = btn.innerHTML;
+function setBtnLoading(btn, loading, label) {
+  if (!btn) return;
+  if (loading) {
+    if (!btn.dataset._oldHtml) btn.dataset._oldHtml = btn.innerHTML;
     btn.disabled = true;
     const txt = label || "Chargement...";
     btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${txt}`;
-  }else{
+  } else {
     btn.disabled = false;
-    if(btn.dataset._oldHtml){
+    if (btn.dataset._oldHtml) {
       btn.innerHTML = btn.dataset._oldHtml;
       delete btn.dataset._oldHtml;
     }
@@ -329,28 +329,28 @@ function setBtnLoading(btn, loading, label){
 
 
 
-function setInlineSpinner(el, show){
-  if(!el) return;
+function setInlineSpinner(el, show) {
+  if (!el) return;
   el.classList.toggle("d-none", !show);
 }
 
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s]));
+  return String(str).replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
 }
 
 // Local time display (avoid 1h shift when API returns ISO in UTC)
-function formatTimeLocal(iso){
-  if(!iso) return "";
-  try{
-    return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
-  }catch(e){
-    return String(iso).slice(11,16);
+function formatTimeLocal(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return String(iso).slice(11, 16);
   }
 }
 
 // Normalize for search (fix "parfois filtre makayfiltrich")
-function normalizeText(s){
+function normalizeText(s) {
   return String(s || "")
     .toLowerCase()
     .normalize("NFD")
@@ -359,66 +359,66 @@ function normalizeText(s){
     .trim();
 }
 
-function normGroup(g){
+function normGroup(g) {
   return String(g ?? "").trim().toUpperCase();
 }
-function getSelectedGroupAdd(){
+function getSelectedGroupAdd() {
   return normGroup(document.querySelector('input[name="groupAdd"]:checked')?.value || "A");
 }
-function getSelectedGroupEdit(){
+function getSelectedGroupEdit() {
   return normGroup(document.querySelector('input[name="groupEdit"]:checked')?.value || "A");
 }
-function setGroupRadios(prefix, group){
+function setGroupRadios(prefix, group) {
   const g = normGroup(group) || "A";
   const a = document.getElementById(prefix + "A");
   const b = document.getElementById(prefix + "B");
   const c = document.getElementById(prefix + "C");
-  if(a) a.checked = (g === "A");
-  if(b) b.checked = (g === "B");
-  if(c) c.checked = (g === "C");
+  if (a) a.checked = (g === "A");
+  if (b) b.checked = (g === "B");
+  if (c) c.checked = (g === "C");
   // keep hidden inputs (for backward compatibility)
-  if(prefix === "groupAdd") { if(groupEl) groupEl.value = g; }
-  if(prefix === "groupEdit") { if(editGroupEl) editGroupEl.value = g; }
+  if (prefix === "groupAdd") { if (groupEl) groupEl.value = g; }
+  if (prefix === "groupEdit") { if (editGroupEl) editGroupEl.value = g; }
 }
 
-function normalizeBadge(s){
+function normalizeBadge(s) {
   return normalizeText(s).replace(/\s+/g, ""); // remove spaces
 }
 
-function readLocalCache(){
-  try{
+function readLocalCache() {
+  try {
     const raw = localStorage.getItem(LS_KEY);
     const ts = Number(localStorage.getItem(LS_TS_KEY) || 0);
-    if(!raw) return null;
+    if (!raw) return null;
     const data = JSON.parse(raw);
-    if(!Array.isArray(data)) return null;
+    if (!Array.isArray(data)) return null;
     return { data, ts };
-  }catch(e){
+  } catch (e) {
     return null;
-  }finally{
+  } finally {
     hideLoader();
   }
 }
-function writeLocalCache(data){
-  try{
+function writeLocalCache(data) {
+  try {
     localStorage.setItem(LS_KEY, JSON.stringify(data));
     localStorage.setItem(LS_TS_KEY, String(Date.now()));
-  }catch(e){}
+  } catch (e) { }
 }
 
-function refreshGroupDatalist(){
-  if(!groupDatalistEl) return;
-  const groups = Array.from(new Set((volunteersCache||[])
-    .map(v => (v.group||"").trim())
+function refreshGroupDatalist() {
+  if (!groupDatalistEl) return;
+  const groups = Array.from(new Set((volunteersCache || [])
+    .map(v => (v.group || "").trim())
     .filter(g => g)))
-    .sort((a,b)=>a.localeCompare(b, "fr"));
+    .sort((a, b) => a.localeCompare(b, "fr"));
   groupDatalistEl.innerHTML = groups.map(g => `<option value="${escapeHtml(g)}"></option>`).join("");
 }
 
 
 
 
-async function refreshTodayPunches(){
+async function refreshTodayPunches() {
   const today = isoDate(new Date());
   const r = await apiReportPunches(today, today);
   if (!r.ok) throw new Error(r.error || "REPORT_ERROR");
@@ -427,7 +427,7 @@ async function refreshTodayPunches(){
 }
 
 
-function computeRolePunchStatus_(){
+function computeRolePunchStatus_() {
   const roleVols = (volunteersCache || []).filter(v => String(v.role || "").trim() !== "");
   const punchedIds = new Set(Array.from((punchedMap || new Map()).keys()).map(k => String(k)));
   const pending = roleVols.filter(v => !punchedIds.has(String(v.id)));
@@ -435,54 +435,54 @@ function computeRolePunchStatus_(){
 }
 
 
-function refreshAutoPunchRolesBtn_(){
-  if(!autoPunchRolesBtn) return;
+function refreshAutoPunchRolesBtn_() {
+  if (!autoPunchRolesBtn) return;
 
-  const role = (localStorage.getItem('role')||'');
+  const role = (localStorage.getItem('role') || '');
   const canSee = (role === 'SUPER_ADMIN' || role === 'ADMIN');
 
-  if(!canSee){
+  if (!canSee) {
     autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+    if (typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
     return;
   }
 
   const st = computeRolePunchStatus_();
 
   // no role volunteers -> hide all
-  if(st.totalRole === 0){
+  if (st.totalRole === 0) {
     autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+    if (typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
     return;
   }
 
   // all pointed -> show green confirmation
-  if(st.pendingCount === 0){
+  if (st.pendingCount === 0) {
     autoPunchRolesBtn.classList.add("d-none");
-    if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.remove("d-none");
+    if (typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.remove("d-none");
     return;
   }
 
   // pending -> show warning button
-  if(typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
+  if (typeof autoPunchRolesDone !== 'undefined' && autoPunchRolesDone) autoPunchRolesDone.classList.add("d-none");
   autoPunchRolesBtn.classList.remove("d-none");
   autoPunchRolesBtn.textContent = `👑 Pointer responsables (${st.pendingCount})`;
 }
 
 
 
-function getVolunteerById(id){
+function getVolunteerById(id) {
   const sid = String(id);
   return volunteersCache.find(v => String(v.id) === sid) || null;
 }
 
-function filterLocal(search){
+function filterLocal(search) {
   const s = normalizeText(search);
   const g = normGroup(groupFilterEl?.value || "");
 
   let base = volunteersCache;
 
-  if(g){
+  if (g) {
     base = base.filter(v => normGroup(v.group || v.groupe) === g);
   }
 
@@ -570,7 +570,7 @@ function render(volunteers, todayISO) {
   }).join("");
 }
 
-function setLoading(msg="Chargement..."){
+function setLoading(msg = "Chargement...") {
   listEl.innerHTML = `
     <div class="text-muted2 small d-flex align-items-center gap-2">
       <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -580,7 +580,7 @@ function setLoading(msg="Chargement..."){
 }
 
 
-function renderFromCache(){
+function renderFromCache() {
   const q = (searchEl?.value || "").trim();
   const filtered = filterLocal(q);
   render(filtered, todayISO);
@@ -598,7 +598,7 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
     await new Promise(r => setTimeout(r, 0));
   }
 
-  try{
+  try {
     // Always refresh today's punches (light)
     todayISO = await refreshTodayPunches();
     todayEl.textContent = `Aujourd'hui : ${todayISO}`;
@@ -615,7 +615,7 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
     const needReload =
       forceReloadVolunteers ||
       volunteersCache.length === 0 ||
-      (now - lastLoadedAt) > 5*60*1000;
+      (now - lastLoadedAt) > 5 * 60 * 1000;
 
     if (needReload) {
       const res = await apiListVolunteers(""); // load all once
@@ -624,70 +624,72 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
       refreshGroupDatalist();
       lastLoadedAt = now;
       writeLocalCache(volunteersCache);
-      try{ OfflineStore?.cacheVolunteersWrite?.(volunteersCache); }catch(e){}
+      try { OfflineStore?.cacheVolunteersWrite?.(volunteersCache); } catch (e) { }
     }
 
     const filtered = filterLocal(q);
     render(filtered, todayISO);
     refreshAutoPunchRolesBtn_();
 
-  }catch(e){
+  } catch (e) {
     console.error(e);
     toast("Impossible de charger les données: " + (e?.message || "UNKNOWN") + ".");
     listEl.innerHTML = `<div class="text-muted2 small">Erreur: ${escapeHtml(e?.message || "UNKNOWN")}</div>`;
-  }finally{
+  } finally {
     if (shouldOverlay) hideLoader();
   }
 }
 
-function bindUI(){
+function bindUI() {
   renderUserPill();
   // Hide SUPER_ADMIN-only UI for ADMIN
-  try{
+  try {
     const openAddBtn = document.getElementById("openAddBtn");
-    if(openAddBtn) openAddBtn.classList.toggle("d-none", !isSuper());
-  }catch(e){}
+    if (openAddBtn) openAddBtn.classList.toggle("d-none", !isSuper());
+  } catch (e) { }
 
   // restore group filter
-  try{
+  try {
     const g = localStorage.getItem("pointage_group_filter") || "";
-    if(groupFilterEl) groupFilterEl.value = g;
-  }catch(e){}
+    if (groupFilterEl) groupFilterEl.value = g;
+  } catch (e) { }
 }
 
-scanBtn?.addEventListener("click", ()=>{
+scanBtn?.addEventListener("click", () => {
   // Admin + Super admin
   location.href = "./scan.html";
 });
 
-groupPunchBtn?.addEventListener("click", async ()=>{
-  if(!isSuper()) return;
+groupPunchBtn?.addEventListener("click", async () => {
+  if (!isSuper()) return;
   // ensure we have volunteers loaded at least once
-  if(!volunteersCache.length){
-    try{ await load(true, true);
+  if (!volunteersCache.length) {
+    try {
+      await load(true, true);
 
-// Net dot + Sync button init
-try{ __checkNetworkStatus(); }catch(e){}
-try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
-window.addEventListener("online", ()=> __setNetDot("online"));
-window.addEventListener("offline", ()=> __setNetDot("offline"));
-try{ __refreshSyncUi(); }catch(e){} }catch(e){}
+      // Net dot + Sync button init
+      try { __checkNetworkStatus(); } catch (e) { }
+      try { setInterval(() => { try { __checkNetworkStatus(); } catch (e) { } }, 8000); } catch (e) { }
+      window.addEventListener("online", () => __setNetDot("online"));
+      window.addEventListener("offline", () => __setNetDot("offline"));
+      try { __refreshSyncUi(); } catch (e) { }
+    } catch (e) { }
   }
   renderGroupPunchRadios(lastGroupPunchSelection);
   groupPunchModal?.show();
 });
 
-autoPunchRolesBtn?.addEventListener("click", async ()=>{
-  const role = (localStorage.getItem('role')||'');
-  if(!(role === 'SUPER_ADMIN' || role === 'ADMIN')) return;
+autoPunchRolesBtn?.addEventListener("click", async () => {
+  const role = (localStorage.getItem('role') || '');
+  if (!(role === 'SUPER_ADMIN' || role === 'ADMIN')) return;
 
   const st = computeRolePunchStatus_();
-  if(st.pendingCount <= 0){
+  if (st.pendingCount <= 0) {
     refreshAutoPunchRolesBtn_();
     return;
   }
 
-  if(!confirm(`Pointer ${st.pendingCount} responsable(s) (role renseigné) ?\n\nLes bénévoles déjà pointés aujourd'hui seront ignorés.`)){
+  if (!confirm(`Pointer ${st.pendingCount} responsable(s) (role renseigné) ?\n\nLes bénévoles déjà pointés aujourd'hui seront ignorés.`)) {
     return;
   }
 
@@ -695,16 +697,16 @@ autoPunchRolesBtn?.addEventListener("click", async ()=>{
   autoPunchRolesBtn.disabled = true;
   autoPunchRolesBtn.textContent = "⏳ Pointage en cours...";
 
-  try{
+  try {
     const today = isoDate(new Date());
     const res = await apiRunAutoPunchRoles(today);
 
-    if(!res){
+    if (!res) {
       toast("Erreur: aucune réponse du serveur (SERVER_ERROR).");
       return;
     }
-    if(!res.ok){
-      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
+    if (!res.ok) {
+      if (res.error === "NOT_AUTHENTICATED") { logout(); return; }
       toast("Erreur: " + (res.error || "UNKNOWN_ACTION"));
       return;
     }
@@ -712,16 +714,16 @@ autoPunchRolesBtn?.addEventListener("click", async ()=>{
     toast(`✅ Terminé: ${res.punchedNew || 0} ajouté(s), ${res.alreadyPunched || 0} déjà pointé(s).`);
     await load(true, true);
 
-// Net dot + Sync button init
-try{ __checkNetworkStatus(); }catch(e){}
-try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
-window.addEventListener("online", ()=> __setNetDot("online"));
-window.addEventListener("offline", ()=> __setNetDot("offline"));
-try{ __refreshSyncUi(); }catch(e){}
-  }catch(e){
+    // Net dot + Sync button init
+    try { __checkNetworkStatus(); } catch (e) { }
+    try { setInterval(() => { try { __checkNetworkStatus(); } catch (e) { } }, 8000); } catch (e) { }
+    window.addEventListener("online", () => __setNetDot("online"));
+    window.addEventListener("offline", () => __setNetDot("offline"));
+    try { __refreshSyncUi(); } catch (e) { }
+  } catch (e) {
     console.error(e);
     toast("Erreur: " + (e?.message || "JSONP error"));
-  }finally{
+  } finally {
     autoPunchRolesBtn.disabled = false;
     autoPunchRolesBtn.textContent = prevText;
     refreshAutoPunchRolesBtn_();
@@ -729,33 +731,33 @@ try{ __refreshSyncUi(); }catch(e){}
 });
 
 
-groupPunchRadiosEl?.addEventListener('change', ()=>{
+groupPunchRadiosEl?.addEventListener('change', () => {
   const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
-  if(!selected) return;
+  if (!selected) return;
   lastGroupPunchSelection = selected;
-  try{
-    const inGroup = (volunteersCache||[]).filter(v => normGroup(v.group||v.groupe) === selected).length;
-    if(groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${selected} » : ${inGroup}. Date : ${todayISO}`;
-  }catch(e){}
+  try {
+    const inGroup = (volunteersCache || []).filter(v => normGroup(v.group || v.groupe) === selected).length;
+    if (groupPunchHintEl) groupPunchHintEl.textContent = `Volontaires dans le groupe « ${selected} » : ${inGroup}. Date : ${todayISO}`;
+  } catch (e) { }
 });
 
-groupPunchDoBtn?.addEventListener('click', async ()=>{
-  if(!isSuper()) return;
+groupPunchDoBtn?.addEventListener('click', async () => {
+  if (!isSuper()) return;
   const selected = normGroup(document.querySelector('input[name="groupPunch"]:checked')?.value || "");
-  if(!selected){
-    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Veuillez choisir un groupe."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
+  if (!selected) {
+    if (groupPunchMsgEl) { groupPunchMsgEl.textContent = "Veuillez choisir un groupe."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
     return;
   }
   lastGroupPunchSelection = selected;
-  if(groupPunchMsgEl){ groupPunchMsgEl.textContent = ""; groupPunchMsgEl.className = "small mt-2"; }
+  if (groupPunchMsgEl) { groupPunchMsgEl.textContent = ""; groupPunchMsgEl.className = "small mt-2"; }
 
   setBtnLoading(groupPunchDoBtn, true, "Pointage...");
-  try{
+  try {
     const res = await apiPunchGroup(selected, todayISO);
-    if(!res.ok){
-      if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-      if(groupPunchMsgEl){
-        const msg = res.error === "EMPTY_GROUP" ? "Aucun volontaire dans ce groupe." : ("Erreur: " + (res.error||"UNKNOWN"));
+    if (!res.ok) {
+      if (res.error === "NOT_AUTHENTICATED") { logout(); return; }
+      if (groupPunchMsgEl) {
+        const msg = res.error === "EMPTY_GROUP" ? "Aucun volontaire dans ce groupe." : ("Erreur: " + (res.error || "UNKNOWN"));
         groupPunchMsgEl.textContent = msg;
         groupPunchMsgEl.className = "small mt-2 text-danger";
       }
@@ -765,7 +767,7 @@ groupPunchDoBtn?.addEventListener('click', async ()=>{
     const punchedNew = Number(res.punchedNew || 0);
     const already = Number(res.alreadyPunched || 0);
     const total = Number(res.totalInGroup || 0);
-    if(groupPunchMsgEl){
+    if (groupPunchMsgEl) {
       groupPunchMsgEl.textContent = `✅ Terminé. Nouveaux pointages: ${punchedNew} • Déjà pointés: ${already} • Total groupe: ${total}`;
       groupPunchMsgEl.className = "small mt-2 text-success";
     }
@@ -775,10 +777,10 @@ groupPunchDoBtn?.addEventListener('click', async ()=>{
     todayISO = await refreshTodayPunches();
     todayEl.textContent = `Aujourd'hui : ${todayISO}`;
     renderFromCache();
-  }catch(e){
+  } catch (e) {
     console.error(e);
-    if(groupPunchMsgEl){ groupPunchMsgEl.textContent = "Erreur réseau."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
-  }finally{
+    if (groupPunchMsgEl) { groupPunchMsgEl.textContent = "Erreur réseau."; groupPunchMsgEl.className = "small mt-2 text-danger"; }
+  } finally {
     setBtnLoading(groupPunchDoBtn, false);
   }
 });
@@ -787,344 +789,344 @@ refreshBtn?.addEventListener("click", () => load(true, true));
 
 __syncBtn?.addEventListener("click", () => __syncOfflineQueue());
 
-  focusSearchBtn?.addEventListener('click', ()=>{ searchEl.focus(); searchEl.select(); });
-  // mobile: focus on first tap anywhere
-  let firstTapFocused=false;
-  document.addEventListener('pointerdown', ()=>{ if(!firstTapFocused){ firstTapFocused=true; setTimeout(()=>{ try{ searchEl.focus(); }catch(e){} }, 0); } }, { once:true });
+focusSearchBtn?.addEventListener('click', () => { searchEl.focus(); searchEl.select(); });
+// mobile: focus on first tap anywhere
+let firstTapFocused = false;
+document.addEventListener('pointerdown', () => { if (!firstTapFocused) { firstTapFocused = true; setTimeout(() => { try { searchEl.focus(); } catch (e) { } }, 0); } }, { once: true });
 
-  
-  // Actions (event delegation)
-  listEl.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button");
-    e.preventDefault();
-    if(!btn) return;
-    const id = btn.dataset.id;
-    const action = btn.dataset.action || btn.dataset.act;
-    if(!action || !id) return;
 
-    // history opens instantly (no loader on button)
-    if(action === "history"){
+// Actions (event delegation)
+listEl.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button");
+  e.preventDefault();
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action || btn.dataset.act;
+  if (!action || !id) return;
+
+  // history opens instantly (no loader on button)
+  if (action === "history") {
+    const v = getVolunteerById(id);
+    if (!v) { toast("Volontaire introuvable."); return; }
+    currentHistVolunteer = v;
+    if (histSubtitle) histSubtitle.textContent = `${v.fullName || ""} • ${v.badgeCode || ""}`;
+    if (historyModal) historyModal.show();
+    // auto load
+    setTimeout(() => histLoadBtn?.click(), 50);
+    return;
+  }
+
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
+
+  try {
+    if (action === "punch") {
+      let res = null;
+      try {
+        res = await apiPunch(id, todayISO);
+      } catch (e) {
+        if (OfflineStore?.isLikelyOffline?.(e)) {
+          try { await OfflineStore.enqueuePunch(id, todayISO, "button"); } catch (_e) { }
+          try { punchedMap?.set(String(id), new Date().toISOString()); } catch (_e) { }
+          toast("Enregistré hors-ligne");
+          try { await __refreshSyncUi(); } catch (_e) { }
+          try { renderFromCache(); } catch (_e) { }
+          return;
+        }
+        throw e;
+      }
+      if (!res.ok) {
+        if (res.error === "ALREADY_PUNCHED") { toast("Déjà pointé aujourd’hui."); }
+        else if (res.error === "NOT_AUTHENTICATED") { logout(); return; }
+        else toast("Erreur: " + (res.error || "UNKNOWN"));
+      } else {
+        toast("✅ Pointage enregistré");
+        soundOk_();
+      }
+      todayISO = await refreshTodayPunches();
+      todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+      renderFromCache();
+      // ensure UI interaction remains responsive after re-render
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    if (action === "undo") {
+      const res = await apiDeletePunch(id, todayISO);
+      if (!res.ok) {
+        if (res.error === "NOT_AUTHENTICATED") { logout(); return; }
+        toast("Erreur: " + (res.error || "UNKNOWN"));
+      } else {
+        toast("✅ Pointage annulé");
+      }
+      todayISO = await refreshTodayPunches();
+      todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+      renderFromCache();
+    }
+
+    if (action === "delete") {
+      if (!isSuper()) return;
       const v = getVolunteerById(id);
-      if(!v){ toast("Volontaire introuvable."); return; }
-      currentHistVolunteer = v;
-      if(histSubtitle) histSubtitle.textContent = `${v.fullName || ""} • ${v.badgeCode || ""}`;
-      if(historyModal) historyModal.show();
-      // auto load
-      setTimeout(()=> histLoadBtn?.click(), 50);
-      return;
-    }
+      const label = v ? `${v.fullName || ""} (${v.badgeCode || ""})` : id;
+      if (!confirm(`Supprimer ce bénévole ?\n\n${label}\n\n⚠️ Les pointages (historique) ne seront pas supprimés.`)) return;
+      const res = await apiDeleteVolunteer(id);
+      if (!res.ok) {
+        if (res.error === "NOT_AUTHENTICATED") { logout(); return; }
+        toast("Erreur: " + (res.error || "UNKNOWN"));
+      } else {
+        toast("✅ Bénévole supprimé");
+        // Reload volunteers from backend then refresh UI
+        await load(true, true);
 
-    const old = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
-
-    try{
-      if(action === "punch"){
-        let res = null;
-        try{
-          res = await apiPunch(id, todayISO);
-        }catch(e){
-          if(OfflineStore?.isLikelyOffline?.(e)){
-            try{ await OfflineStore.enqueuePunch(id, todayISO, "button"); }catch(_e){}
-            try{ punchedMap?.set(String(id), new Date().toISOString()); }catch(_e){}
-            toast("Enregistré hors-ligne");
-            try{ await __refreshSyncUi(); }catch(_e){}
-            try{ renderFromCache(); }catch(_e){}
-            return;
-          }
-          throw e;
-        }
-        if(!res.ok){
-          if(res.error === "ALREADY_PUNCHED"){ toast("Déjà pointé aujourd’hui."); }
-          else if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-          else toast("Erreur: " + (res.error || "UNKNOWN"));
-        }else{
-          toast("✅ Pointage enregistré");
-      soundOk_();
-        }
-        todayISO = await refreshTodayPunches();
-        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
-        renderFromCache();
-        // ensure UI interaction remains responsive after re-render
-        await new Promise(r=>setTimeout(r,0));
-      }
-
-      if(action === "undo"){
-        const res = await apiDeletePunch(id, todayISO);
-        if(!res.ok){
-          if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-          toast("Erreur: " + (res.error || "UNKNOWN"));
-        }else{
-          toast("✅ Pointage annulé");
-        }
-        todayISO = await refreshTodayPunches();
-        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
-        renderFromCache();
-      }
-
-      if(action === "delete"){
-        if(!isSuper()) return;
-        const v = getVolunteerById(id);
-        const label = v ? `${v.fullName || ""} (${v.badgeCode || ""})` : id;
-        if(!confirm(`Supprimer ce bénévole ?\n\n${label}\n\n⚠️ Les pointages (historique) ne seront pas supprimés.`)) return;
-        const res = await apiDeleteVolunteer(id);
-        if(!res.ok){
-          if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
-          toast("Erreur: " + (res.error || "UNKNOWN"));
-        }else{
-          toast("✅ Bénévole supprimé");
-          // Reload volunteers from backend then refresh UI
-          await load(true, true);
-
-// Net dot + Sync button init
-try{ __checkNetworkStatus(); }catch(e){}
-try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
-window.addEventListener("online", ()=> __setNetDot("online"));
-window.addEventListener("offline", ()=> __setNetDot("offline"));
-try{ __refreshSyncUi(); }catch(e){}
-        }
-      }
-
-      if(action === "edit"){
-        const v = getVolunteerById(id);
-        if(!v){ toast("Volontaire introuvable."); return; }
-        editMsg.textContent = "";
-        editMsg.className = "small";
-        editIdEl.value = String(v.id);
-        editFullNameEl.value = v.fullName || "";
-        editBadgeCodeEl.value = v.badgeCode || "";
-        if(editQrCodeEl) editQrCodeEl.value = v.qrCode || "";
-        editPhoneEl.value = v.phone || "";
-        setGroupRadios("groupEdit", v.group || "A");
-        editModal?.show();
-      }
-    }catch(err){
-      console.error(err);
-      toast("Erreur inattendue.");
-    }finally{
-      try{ btn.blur && btn.blur(); }catch(e){}
-      if(btn && btn.isConnected){
-        btn.disabled = false;
-        btn.innerHTML = old;
+        // Net dot + Sync button init
+        try { __checkNetworkStatus(); } catch (e) { }
+        try { setInterval(() => { try { __checkNetworkStatus(); } catch (e) { } }, 8000); } catch (e) { }
+        window.addEventListener("online", () => __setNetDot("online"));
+        window.addEventListener("offline", () => __setNetDot("offline"));
+        try { __refreshSyncUi(); } catch (e) { }
       }
     }
-  });
 
-clearSearchBtn?.addEventListener("click", ()=>{ searchEl.value=""; renderFromCache(); });
+    if (action === "edit") {
+      const v = getVolunteerById(id);
+      if (!v) { toast("Volontaire introuvable."); return; }
+      editMsg.textContent = "";
+      editMsg.className = "small";
+      editIdEl.value = String(v.id);
+      editFullNameEl.value = v.fullName || "";
+      editBadgeCodeEl.value = v.badgeCode || "";
+      if (editQrCodeEl) editQrCodeEl.value = v.qrCode || "";
+      editPhoneEl.value = v.phone || "";
+      setGroupRadios("groupEdit", v.group || "A");
+      editModal?.show();
+    }
+  } catch (err) {
+    console.error(err);
+    toast("Erreur inattendue.");
+  } finally {
+    try { btn.blur && btn.blur(); } catch (e) { }
+    if (btn && btn.isConnected) {
+      btn.disabled = false;
+      btn.innerHTML = old;
+    }
+  }
+});
+
+clearSearchBtn?.addEventListener("click", () => { searchEl.value = ""; renderFromCache(); });
 
 let debounce;
-  searchEl?.addEventListener("input", ()=>{
-    clearTimeout(debounce);
-    debounce = setTimeout(()=>{
-      renderFromCache();
-    }, 120);
-  });
-  groupFilterEl?.addEventListener("change", ()=>{
-    try{ localStorage.setItem("pointage_group_filter", groupFilterEl.value||""); }catch(e){}
+searchEl?.addEventListener("input", () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
     renderFromCache();
-  });
+  }, 120);
+});
+groupFilterEl?.addEventListener("change", () => {
+  try { localStorage.setItem("pointage_group_filter", groupFilterEl.value || ""); } catch (e) { }
+  renderFromCache();
+});
 logoutBtn?.addEventListener("click", logout);
 
-  openAddBtn?.addEventListener("click", ()=>{
-    addMsg.textContent = "";
-    addMsg.className = "small";
-    setGroupRadios("groupAdd", "A");
-    if(qrCodeEl) qrCodeEl.value = "";
-    // Default: ne pas pointer immédiatement
-    try{
-      const r = document.querySelector('input[name="punchNowAdd"][value="no"]');
-      if(r) r.checked = true;
-    }catch(e){}
-    addModal?.show();
-  });
+openAddBtn?.addEventListener("click", () => {
+  addMsg.textContent = "";
+  addMsg.className = "small";
+  setGroupRadios("groupAdd", "A");
+  if (qrCodeEl) qrCodeEl.value = "";
+  // Default: ne pas pointer immédiatement
+  try {
+    const r = document.querySelector('input[name="punchNowAdd"][value="no"]');
+    if (r) r.checked = true;
+  } catch (e) { }
+  addModal?.show();
+});
 
-  addForm?.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    addMsg.textContent = "";
-    addMsg.className = "small";
-    const submitBtn = addForm.querySelector('button[type="submit"]');
-    resetBtn(submitBtn, "Enregistrer");
+addForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  addMsg.textContent = "";
+  addMsg.className = "small";
+  const submitBtn = addForm.querySelector('button[type="submit"]');
+  resetBtn(submitBtn, "Enregistrer");
+  setInlineSpinner(addSpinnerEl, false);
+
+  const fullName = (fullNameEl.value || "").trim();
+  const badgeCode = (badgeCodeEl.value || "").trim();
+  const qrCode = (qrCodeEl ? (qrCodeEl.value || "") : "").trim();
+  const phone = (phoneEl.value || "").trim();
+  const group = getSelectedGroupAdd();
+  const punchNow = (document.querySelector('input[name="punchNowAdd"]:checked')?.value === "yes");
+  if (groupEl) groupEl.value = group;
+  if (!fullName) {
     setInlineSpinner(addSpinnerEl, false);
+    setBtnLoading(submitBtn, false);
+    addMsg.textContent = "Le nom complet est obligatoire.";
+    addMsg.className = "small text-danger";
+    return;
+  }
 
-    const fullName = (fullNameEl.value || "").trim();
-    const badgeCode = (badgeCodeEl.value || "").trim();
-    const qrCode = (qrCodeEl ? (qrCodeEl.value || "") : "").trim();
-    const phone = (phoneEl.value || "").trim();
-    const group = getSelectedGroupAdd();
-    const punchNow = (document.querySelector('input[name="punchNowAdd"]:checked')?.value === "yes");
-    if(groupEl) groupEl.value = group;
-    if(!fullName){
+  setBtnLoading(submitBtn, true, "Enregistrement...");
+  setInlineSpinner(addSpinnerEl, true);
+
+  try {
+    const res = await apiAddVolunteer(fullName, badgeCode, qrCode, phone, group);
+    if (!res.ok) {
+      addMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
+        ? "Ce code badge existe déjà."
+        : (res.error === "QR_ALREADY_EXISTS"
+          ? "Ce code QR existe déjà."
+          : ("Erreur: " + (res.error || "UNKNOWN")));
       setInlineSpinner(addSpinnerEl, false);
-      setBtnLoading(submitBtn, false);
-      addMsg.textContent = "Le nom complet est obligatoire.";
       addMsg.className = "small text-danger";
       return;
     }
 
-    setBtnLoading(submitBtn, true, "Enregistrement...");
-    setInlineSpinner(addSpinnerEl, true);
+    volunteersCache.unshift({
+      id: res.id,
+      fullName,
+      badgeCode,
+      qrCode,
+      phone,
+      group
+    });
+    writeLocalCache(volunteersCache);
+    try { OfflineStore?.cacheVolunteersWrite?.(volunteersCache); } catch (e) { }
 
-    try{
-      const res = await apiAddVolunteer(fullName, badgeCode, qrCode, phone, group);
-      if(!res.ok){
-        addMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
-          ? "Ce code badge existe déjà."
-          : (res.error === "QR_ALREADY_EXISTS"
-            ? "Ce code QR existe déjà."
-            : ("Erreur: " + (res.error || "UNKNOWN")));
-        setInlineSpinner(addSpinnerEl, false);
-        addMsg.className = "small text-danger";
-        return;
-      }
-
-      volunteersCache.unshift({
-        id: res.id,
-        fullName,
-        badgeCode,
-        qrCode,
-        phone,
-        group
-      });
-      writeLocalCache(volunteersCache);
-      try{ OfflineStore?.cacheVolunteersWrite?.(volunteersCache); }catch(e){}
-
-      // Optional: punch immediately after adding
-      let punchMsg = "";
-      if(punchNow){
-        try{
-          let punchRes = null;
-          const dateISO_ = (todayISO || isoDate(new Date()));
-          try{
-            punchRes = await apiPunch(res.id, dateISO_);
-          }catch(e){
-            if(OfflineStore?.isLikelyOffline?.(e)){
-              try{ await OfflineStore.enqueuePunch(res.id, dateISO_, "button-add"); }catch(_e){}
-              try{ punchedMap?.set(String(res.id), new Date().toISOString()); }catch(_e){}
-              try{ await __refreshSyncUi(); }catch(_e){}
-              punchRes = { ok: true, offline: true };
-            }else{
-              throw e;
-            }
+    // Optional: punch immediately after adding
+    let punchMsg = "";
+    if (punchNow) {
+      try {
+        let punchRes = null;
+        const dateISO_ = (todayISO || isoDate(new Date()));
+        try {
+          punchRes = await apiPunch(res.id, dateISO_);
+        } catch (e) {
+          if (OfflineStore?.isLikelyOffline?.(e)) {
+            try { await OfflineStore.enqueuePunch(res.id, dateISO_, "button-add"); } catch (_e) { }
+            try { punchedMap?.set(String(res.id), new Date().toISOString()); } catch (_e) { }
+            try { await __refreshSyncUi(); } catch (_e) { }
+            punchRes = { ok: true, offline: true };
+          } else {
+            throw e;
           }
-          if(!punchRes.ok){
-            if(punchRes.error === "ALREADY_PUNCHED"){
-              // include time if provided
-              const t = punchRes.punchedAt ? formatTimeLocal(punchRes.punchedAt) : "";
-              punchMsg = t ? ` (déjà pointé à ${t})` : " (déjà pointé)";
-            }else{
-              punchMsg = ` (pointage non enregistré: ${punchRes.error || "UNKNOWN"})`;
-            }
-          }else{
-            punchMsg = " (pointé aujourd’hui ✅)";
-          }
-        }catch(e){
-          punchMsg = " (pointage non enregistré: erreur réseau)";
         }
+        if (!punchRes.ok) {
+          if (punchRes.error === "ALREADY_PUNCHED") {
+            // include time if provided
+            const t = punchRes.punchedAt ? formatTimeLocal(punchRes.punchedAt) : "";
+            punchMsg = t ? ` (déjà pointé à ${t})` : " (déjà pointé)";
+          } else {
+            punchMsg = ` (pointage non enregistré: ${punchRes.error || "UNKNOWN"})`;
+          }
+        } else {
+          punchMsg = " (pointé aujourd’hui ✅)";
+        }
+      } catch (e) {
+        punchMsg = " (pointage non enregistré: erreur réseau)";
       }
-
-      addMsg.textContent = "✅ Volontaire ajouté" + punchMsg;
-      addMsg.className = punchNow ? "small text-success" : "small text-success";
-      setInlineSpinner(addSpinnerEl, false);
-      fullNameEl.value = "";
-      badgeCodeEl.value = "";
-      if(qrCodeEl) qrCodeEl.value = "";
-      phoneEl.value = "";
-
-      // Refresh punches so the list shows the correct status
-      try{
-        todayISO = await refreshTodayPunches();
-        todayEl.textContent = `Aujourd'hui : ${todayISO}`;
-      }catch(e){}
-
-      setTimeout(()=> addModal?.hide(), 600);
-      renderFromCache();
-
-    }catch(err){
-      console.error(err);
-      setInlineSpinner(addSpinnerEl, false);
-      addMsg.textContent = "Erreur API (Apps Script).";
-      addMsg.className = "small text-danger";
-    }finally{
-      setInlineSpinner(addSpinnerEl, false);
-      setBtnLoading(submitBtn, false);
     }
-  });
-  // Edit volunteer submit
-  editForm?.addEventListener("submit", async (e)=>{
-    e.preventDefault();
 
-    editMsg.textContent = "";
-    editMsg.className = "small";
+    addMsg.textContent = "✅ Volontaire ajouté" + punchMsg;
+    addMsg.className = punchNow ? "small text-success" : "small text-success";
+    setInlineSpinner(addSpinnerEl, false);
+    fullNameEl.value = "";
+    badgeCodeEl.value = "";
+    if (qrCodeEl) qrCodeEl.value = "";
+    phoneEl.value = "";
 
-    const id = (editIdEl.value || "").trim();
-    const fullName = (editFullNameEl.value || "").trim();
-    const badgeCode = (editBadgeCodeEl.value || "").trim();
-    const qrCode = (editQrCodeEl ? (editQrCodeEl.value || "") : "").trim();
-    const phone = (editPhoneEl.value || "").trim();
-    const group = getSelectedGroupEdit();
-    if(editGroupEl) editGroupEl.value = group;
+    // Refresh punches so the list shows the correct status
+    try {
+      todayISO = await refreshTodayPunches();
+      todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    } catch (e) { }
 
-    const submitBtn = editForm.querySelector('button[type="submit"]');
-    // Safety reset (in case previous submit got interrupted)
-    resetBtn(submitBtn, "Mettre à jour");
+    setTimeout(() => addModal?.hide(), 600);
+    renderFromCache();
 
-    if(!id || !fullName){
-      editMsg.textContent = "Le nom complet est obligatoire.";
+  } catch (err) {
+    console.error(err);
+    setInlineSpinner(addSpinnerEl, false);
+    addMsg.textContent = "Erreur API (Apps Script).";
+    addMsg.className = "small text-danger";
+  } finally {
+    setInlineSpinner(addSpinnerEl, false);
+    setBtnLoading(submitBtn, false);
+  }
+});
+// Edit volunteer submit
+editForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  editMsg.textContent = "";
+  editMsg.className = "small";
+
+  const id = (editIdEl.value || "").trim();
+  const fullName = (editFullNameEl.value || "").trim();
+  const badgeCode = (editBadgeCodeEl.value || "").trim();
+  const qrCode = (editQrCodeEl ? (editQrCodeEl.value || "") : "").trim();
+  const phone = (editPhoneEl.value || "").trim();
+  const group = getSelectedGroupEdit();
+  if (editGroupEl) editGroupEl.value = group;
+
+  const submitBtn = editForm.querySelector('button[type="submit"]');
+  // Safety reset (in case previous submit got interrupted)
+  resetBtn(submitBtn, "Mettre à jour");
+
+  if (!id || !fullName) {
+    editMsg.textContent = "Le nom complet est obligatoire.";
+    editMsg.className = "small text-danger";
+    return;
+  }
+
+  setBtnLoading(submitBtn, true, "Mise à jour...");
+
+  setInlineSpinner(editSpinnerEl, true);
+
+  try {
+    const res = await apiUpdateVolunteer(id, fullName, badgeCode, qrCode, phone, group);
+    if (!res.ok) {
+      editMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
+        ? "Ce code badge existe déjà."
+        : (res.error === "QR_ALREADY_EXISTS"
+          ? "Ce code QR existe déjà."
+          : ("Erreur: " + (res.error || "UNKNOWN")));
+      setInlineSpinner(editSpinnerEl, false);
       editMsg.className = "small text-danger";
       return;
     }
 
-    setBtnLoading(submitBtn, true, "Mise à jour...");
-
-    setInlineSpinner(editSpinnerEl, true);
-
-    try{
-      const res = await apiUpdateVolunteer(id, fullName, badgeCode, qrCode, phone, group);
-      if(!res.ok){
-        editMsg.textContent = res.error === "BADGE_ALREADY_EXISTS"
-          ? "Ce code badge existe déjà."
-          : (res.error === "QR_ALREADY_EXISTS"
-            ? "Ce code QR existe déjà."
-            : ("Erreur: " + (res.error || "UNKNOWN")));
-        setInlineSpinner(editSpinnerEl, false);
-        editMsg.className = "small text-danger";
-        return;
-      }
-
-      // update cache locally
-      const v = volunteersCache.find(x => String(x.id) === String(id));
-      if(v){
-        v.fullName = fullName;
-        v.badgeCode = badgeCode;
-        v.qrCode = qrCode;
-        v.phone = phone;
-          v.group = group;
-      }
-      writeLocalCache(volunteersCache);
-      try{ OfflineStore?.cacheVolunteersWrite?.(volunteersCache); }catch(e){}
-
-      editMsg.textContent = "✅ Mise à jour effectuée";
-      editMsg.className = "small text-success";
-      setInlineSpinner(editSpinnerEl, false);
-
-      // re-render after refresh punches (to ensure status ok)
-      renderFromCache();
-
-      // hide after small delay
-      setTimeout(()=> editModal?.hide(), 450);
-
-    }catch(err){
-      console.error(err);
-      setInlineSpinner(editSpinnerEl, false);
-      editMsg.textContent = "Erreur API (Apps Script).";
-      editMsg.className = "small text-danger";
-    }finally{
-      setInlineSpinner(editSpinnerEl, false);
-      // Always restore button state
-      setBtnLoading(submitBtn, false);
+    // update cache locally
+    const v = volunteersCache.find(x => String(x.id) === String(id));
+    if (v) {
+      v.fullName = fullName;
+      v.badgeCode = badgeCode;
+      v.qrCode = qrCode;
+      v.phone = phone;
+      v.group = group;
     }
-  });
-function applyRoleUI(){
+    writeLocalCache(volunteersCache);
+    try { OfflineStore?.cacheVolunteersWrite?.(volunteersCache); } catch (e) { }
+
+    editMsg.textContent = "✅ Mise à jour effectuée";
+    editMsg.className = "small text-success";
+    setInlineSpinner(editSpinnerEl, false);
+
+    // re-render after refresh punches (to ensure status ok)
+    renderFromCache();
+
+    // hide after small delay
+    setTimeout(() => editModal?.hide(), 450);
+
+  } catch (err) {
+    console.error(err);
+    setInlineSpinner(editSpinnerEl, false);
+    editMsg.textContent = "Erreur API (Apps Script).";
+    editMsg.className = "small text-danger";
+  } finally {
+    setInlineSpinner(editSpinnerEl, false);
+    // Always restore button state
+    setBtnLoading(submitBtn, false);
+  }
+});
+function applyRoleUI() {
   const superOnly = document.querySelectorAll('[data-super-only]');
   superOnly.forEach(el => { el.style.display = isSuper() ? '' : 'none'; });
 
@@ -1132,22 +1134,22 @@ function applyRoleUI(){
   adminOnly.forEach(el => { el.style.display = isAdminOrSuper() ? '' : 'none'; });
 }
 
-function applyPlanningUI(){
-  try{
-    const todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0,10);
+function applyPlanningUI() {
+  try {
+    const todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0, 10);
     const workG = plannedGroupForDate(todayISO);
 
     // default group filter = groupe actif du jour (si pas déjà choisi)
-    if(groupFilterEl && !groupFilterEl.value){
+    if (groupFilterEl && !groupFilterEl.value) {
       groupFilterEl.value = workG;
     }
 
     // title
     const titleEl = document.getElementById("pageTitle");
-    if(titleEl){
+    if (titleEl) {
       titleEl.textContent = `Volontaires Groupe ${workG} : 15h - 19h`;
     }
-  }catch(e){
+  } catch (e) {
     console.warn("applyPlanningUI", e);
   }
 }
@@ -1155,84 +1157,88 @@ function applyPlanningUI(){
 
 
 // ===== Offline queue (PUNCH) + Sync UI (added) =====
-function __setNetDot(state){
-  if(!__netDotEl) return;
-  __netDotEl.classList.remove("net-online","net-offline","net-unknown");
-  if(state === "online"){ __netDotEl.classList.add("net-online"); __netDotEl.title="En ligne"; }
-  else if(state === "offline"){ __netDotEl.classList.add("net-offline"); __netDotEl.title="Hors-ligne"; }
-  else { __netDotEl.classList.add("net-unknown"); __netDotEl.title="Connexion"; }
+function __setNetDot(state) {
+  if (!__netDotEl) return;
+  __netDotEl.classList.remove("net-online", "net-offline", "net-unknown");
+  if (state === "online") { __netDotEl.classList.add("net-online"); __netDotEl.title = "En ligne"; }
+  else if (state === "offline") { __netDotEl.classList.add("net-offline"); __netDotEl.title = "Hors-ligne"; }
+  else { __netDotEl.classList.add("net-unknown"); __netDotEl.title = "Connexion"; }
 }
 
-async function __checkNetworkStatus(){
-  try{
-    if(!navigator.onLine){ __setNetDot("offline"); return; }
+async function __checkNetworkStatus() {
+  try {
+    if (!navigator.onLine) { __setNetDot("offline"); return; }
     await apiMe();
     __setNetDot("online");
-  }catch(e){
+  } catch (e) {
     __setNetDot("offline");
   }
 }
 
-async function __refreshSyncUi(){
-  try{
-    if(!__syncBtn || !window.OfflineStore) return;
+async function __refreshSyncUi() {
+  try {
+    if (!__syncBtn || !window.OfflineStore) return;
     const n = await OfflineStore.queueCount();
-    if(__syncCountEl) __syncCountEl.textContent = String(n);
+    if (__syncCountEl) __syncCountEl.textContent = String(n);
     __syncBtn.classList.toggle("d-none", n <= 0);
     __syncBtn.disabled = n <= 0;
-  }catch(e){}
+  } catch (e) { }
 }
 
-async function __mergeQueuedIntoPunchMap(dateISO){
-  try{
-    if(!window.OfflineStore || !punchedMap) return;
+async function __mergeQueuedIntoPunchMap(dateISO) {
+  try {
+    if (!window.OfflineStore || !punchedMap) return;
     const ops = await OfflineStore.queueList();
-    const d = String(dateISO||"");
-    for(const op of (ops||[])){
-      if(op && op.type === "PUNCH" && String(op.dateISO||"") === d){
+    const d = String(dateISO || "");
+    for (const op of (ops || [])) {
+      if (op && op.type === "PUNCH" && String(op.dateISO || "") === d) {
         const vid = String(op.volunteerId);
-        if(vid && !punchedMap.get(vid)){
+        if (vid && !punchedMap.get(vid)) {
           punchedMap.set(vid, new Date().toISOString());
         }
       }
     }
-  }catch(e){}
+  } catch (e) { }
 }
 
-async function __syncOfflineQueue(){
-  if(!__syncBtn || !window.OfflineStore) return;
+async function __syncOfflineQueue() {
+  if (!__syncBtn || !window.OfflineStore) return;
   __syncBtn.disabled = true;
-  try{
+  const sp = document.getElementById("syncSpinner");
+  if (sp) sp.classList.remove("d-none");
+  try {
     const ops = await OfflineStore.queueList();
-    if(!ops || ops.length === 0){ await __refreshSyncUi(); return; }
+    if (!ops || ops.length === 0) { await __refreshSyncUi(); return; }
 
     let sent = 0, already = 0;
     const done = [];
 
-    for(const op of ops){
-      if(!op || op.type !== "PUNCH") continue;
-      try{
+    for (const op of ops) {
+      if (!op || op.type !== "PUNCH") continue;
+      try {
         const res = await apiPunch(op.volunteerId, op.dateISO);
-        if(res && res.ok){ sent++; done.push(op.id); }
-        else if(res && res.error === "ALREADY_PUNCHED"){ already++; done.push(op.id); }
-      }catch(e){
+        if (res && res.ok) { sent++; done.push(op.id); }
+        else if (res && res.error === "ALREADY_PUNCHED") { already++; done.push(op.id); }
+      } catch (e) {
         // still offline -> stop
         break;
       }
     }
 
-    if(done.length){
+    if (done.length) {
       await OfflineStore.queueDeleteByIds(done);
       toast(`Synchronisation: ${sent} envoyés, ${already} déjà pointés.`);
     }
 
-    try{
+    try {
       await refreshTodayPunches();
       await __mergeQueuedIntoPunchMap(isoDate(new Date()));
       renderFromCache();
-    }catch(e){}
-  }finally{
+    } catch (e) { }
+  } finally {
     __syncBtn.disabled = false;
+    const sp = document.getElementById("syncSpinner");
+    if (sp) sp.classList.add("d-none");
     await __refreshSyncUi();
   }
 }
@@ -1244,8 +1250,8 @@ applyPlanningUI();
 load(true, true);
 
 // Net dot + Sync button init
-try{ __checkNetworkStatus(); }catch(e){}
-try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
-window.addEventListener("online", ()=> __setNetDot("online"));
-window.addEventListener("offline", ()=> __setNetDot("offline"));
-try{ __refreshSyncUi(); }catch(e){}
+try { __checkNetworkStatus(); } catch (e) { }
+try { setInterval(() => { try { __checkNetworkStatus(); } catch (e) { } }, 8000); } catch (e) { }
+window.addEventListener("online", () => __setNetDot("online"));
+window.addEventListener("offline", () => __setNetDot("offline"));
+try { __refreshSyncUi(); } catch (e) { }
