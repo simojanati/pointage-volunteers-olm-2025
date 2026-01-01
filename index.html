@@ -90,6 +90,8 @@
         localStorage.setItem("sessionToken", res.sessionToken);
         localStorage.setItem("role", String(res.role || "").toUpperCase());
         localStorage.setItem("username", res.username || username);
+        if(res.nomComplet) localStorage.setItem("nomComplet", res.nomComplet);
+        else localStorage.removeItem("nomComplet");
         location.href = "./admin.html";
       } catch (err) {
         console.error(err);

@@ -3,7 +3,7 @@
  * Sheets required:
  *  - Volunteers: id | full_name | badge_code | qr_code | phone | group
  *  - Punches: punch_date | volunteer_id | punched_at | badge_code | full_name
- *  - Users: username | pin | role | active
+ *  - Users: username | pin | role | active | nomComplet
  */
 const TOKEN = "TOKEN_OLM_FANZONE_2025_12H_18H";
 
@@ -199,7 +199,8 @@ function newSession(user){
   const cache = CacheService.getScriptCache();
   cache.put("sess_"+token, JSON.stringify({
     username: user.username,
-    role: user.role
+    role: user.role,
+    nomComplet: user.nomComplet || ""
   }), 6 * 60 * 60); // 6h
   return token;
 }
@@ -343,7 +344,7 @@ if(action === "dashboardStats"){
 function me(p){
   const sess = getSession(p.sessionToken);
   if(!sess) return { ok:false, error:"NOT_AUTHENTICATED" };
-  return { ok:true, username:sess.username, role:sess.role };
+  return { ok:true, username:sess.username, role:sess.role, nomComplet:sess.nomComplet || "" };
 }
 
 function login(p){
@@ -353,6 +354,7 @@ function login(p){
 
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_USERS);
   if(!sh) return { ok:false, error:"USERS_SHEET_NOT_FOUND" };
+  ensureHeader(sh, "nomComplet");
 
   const h = headerIndex(sh);
   if(!h.ok) return h;
@@ -369,9 +371,11 @@ function login(p){
 
   let role = String(row[idx.role]||"ADMIN").trim().toUpperCase();
   if(!(role in ROLE_ORDER)) role = "ADMIN";
-  const sessionToken = newSession({ username, role });
 
-  return { ok:true, sessionToken, role, username };
+  const nomComplet = (idx.nomcomplet !== undefined) ? String(row[idx.nomcomplet]||"").trim() : "";
+  const sessionToken = newSession({ username, role, nomComplet });
+
+  return { ok:true, sessionToken, role, username, nomComplet };
 }
 
 /** ---------------- Core: Volunteers & Punches ---------------- */

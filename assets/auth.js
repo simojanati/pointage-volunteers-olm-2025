@@ -16,5 +16,6 @@ function logout(){
   localStorage.removeItem("sessionToken");
   localStorage.removeItem("role");
   localStorage.removeItem("username");
+  localStorage.removeItem("nomComplet");
   location.href = "./index.html";
 }

@@ -13,7 +13,7 @@ function renderUserPill(){
     el.prepend(dot);
   }
 
-  const u = localStorage.getItem("username") || "—";
+  const u = (localStorage.getItem("nomComplet") || localStorage.getItem("username")) || "—";
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
