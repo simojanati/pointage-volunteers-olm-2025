@@ -61,7 +61,7 @@ document.addEventListener("pointerdown", () => {
 }, { once: true });
 window.addEventListener("load", () => {
   if (!document.getElementById("soundHint")) {
-    setTimeout(() => { const el = document.getElementById('soundHint'); if (el) el.style.opacity = '0.9'; }, 50);
+    setTimeout(() => { const el = document.getElementById('soundHint'); if (el) el.style.opacity = '0.9'; }, 20);
   }
 });
 
@@ -193,6 +193,14 @@ async function punchVolunteerAfterAssign(v, rawCode) {
       res = await apiPunch(v.id, today);
     } catch (e) {
       if (OfflineStore?.isLikelyOffline?.(e)) {
+        const already = await isAlreadyQueuedOrCachedPunch_(v.id, today);
+        if (already) {
+          soundErr_();
+          setStatus(`❌ <b>${escapeHtml(v.fullName || '')}</b> est déjà pointé aujourd’hui (hors-ligne).`, 'danger');
+          toast('Déjà pointé');
+          __showScanSuccessOverlay_('Déjà pointé');
+          return;
+        }
         try { await OfflineStore.enqueuePunch(v.id, today, 'scan'); } catch (_e) { }
         playSuccessBeep();
         __showScanSuccessOverlay_('Enregistré hors-ligne');
@@ -221,6 +229,14 @@ async function punchVolunteerAfterAssign(v, rawCode) {
   } catch (e) {
     const offline = (!navigator.onLine) || (OfflineStore?.isLikelyOffline?.(e));
     if (offline) {
+      const already = await isAlreadyQueuedOrCachedPunch_(v.id, today);
+      if (already) {
+        soundErr_();
+        setStatus(`❌ <b>${escapeHtml(v.fullName || '')}</b> est déjà pointé aujourd’hui (hors-ligne).`, 'danger');
+        toast('Déjà pointé');
+        __showScanSuccessOverlay_('Déjà pointé');
+        return;
+      }
       try { await OfflineStore.enqueuePunch(v.id, today, 'scan'); } catch (_e) { }
       playSuccessBeep();
       __showScanSuccessOverlay_('Enregistré hors-ligne');
@@ -768,40 +784,31 @@ async function processCode(rawCode, source = 'scan') {
   } catch (e) {
     const offline = (!navigator.onLine) || (window.OfflineStore?.isLikelyOffline?.(e));
     if (offline && window.OfflineStore) {
-
       const already = await isAlreadyQueuedOrCachedPunch_(v.id, today);
 
       if (already) {
-        // Déjà pointé hors-ligne
-        __beepScanOk_();
-        __showScanSuccessOverlay_("Déjà pointé");
+        // déjà pointé (offline)
+        soundErr_();
+        setStatus(`❌ <b>${escapeHtml(v.fullName || '')}</b> est déjà pointé aujourd’hui (hors-ligne).`, 'danger');
+        toast('Déjà pointé');
+        __showScanSuccessOverlay_('Déjà pointé');
         return;
       }
 
       // nouveau punch hors-ligne
       await OfflineStore.enqueuePunch(v.id, today, "scan");
-      __beepScanOk_();
-      __showScanSuccessOverlay_("Enregistré hors-ligne");
+      playSuccessBeep();
+      setStatus(`✅ Pointage enregistré (hors-ligne) : <b>${escapeHtml(v.fullName || '')}</b>.`, 'ok');
+      __showScanSuccessOverlay_('Enregistré hors-ligne');
       return;
     }
+
     setStatus('❌ Erreur API (Apps Script).', 'danger');
     toast('Erreur API');
     throw e;
   }
-  // online OK
-  if (res && res.ok) {
-    __beepScanOk_();
-    __showScanSuccessOverlay_("");
-    return;
-  }
-
-  // si API dit déjà pointé
-  if (res && res.error === "ALREADY_PUNCHED") {
-    __beepScanOk_();
-    __showScanSuccessOverlay_("Déjà pointé");
-    return;
-  }
 }
+
 
 function onScanSuccess(decodedText) {
   if (processing) return;
