@@ -1,4 +1,4 @@
-// OfflineStore (IndexedDB): cache + queue (PUNCH uniquement)
+// OfflineStore (IndexedDB): cache + queue (PUNCH only)
 (function(){
   const IDB_NAME = "pointage_volunteers_olm_2025";
   const IDB_VERSION = 1;
@@ -116,7 +116,7 @@
   async function enqueuePunch(volunteerId, dateISO, source){
     const vid = String(volunteerId);
     const date = String(dateISO||"");
-    const dedupKey = `PUNCH|${vid}|${date}`;
+    const dedupKey = "PUNCH|" + vid + "|" + date;
     const op = {
       type: "PUNCH",
       volunteerId: vid,
@@ -125,9 +125,9 @@
       createdAt: Date.now(),
       dedupKey
     };
-    try{ await queueAdd(op); }catch(e){ /* already queued */ }
+    try{ await queueAdd(op); }catch(e){ /* probably duplicate */ }
 
-    // optimistic cache update for deja-pointé
+    // optimistic cache update
     try{
       const cached = await cachePunchesRead(date);
       let map = new Map();

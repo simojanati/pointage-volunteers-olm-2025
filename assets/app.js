@@ -6,7 +6,9 @@ function ensureAudioCtx_(){
   const AC = window.AudioContext || window.webkitAudioContext;
   if(!AC) return null;
   if(!__audioCtx) __audioCtx = new AC();
-  try{ if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{}); }catch(e){}
+  try{
+    if(__audioCtx.state === "suspended") __audioCtx.resume().catch(()=>{});
+  }catch(e){}
   return __audioCtx;
 }
 function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
@@ -17,7 +19,8 @@ function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
   o.type = type;
   o.frequency.value = freq;
   g.gain.value = vol;
-  o.connect(g); g.connect(ctx.destination);
+  o.connect(g);
+  g.connect(ctx.destination);
   const t = ctx.currentTime;
   o.start(t);
   try{
@@ -27,20 +30,24 @@ function beep_(freq=880, durSec=0.12, vol=0.18, type="sine"){
   o.stop(t + durSec);
 }
 function soundOk_(){
-  beep_(880, 0.10, 0.20, "sine");
-  setTimeout(()=>beep_(1175, 0.08, 0.16, "sine"), 120);
+  beep_(880, 0.10, 0.22, "sine");
+  setTimeout(()=>beep_(1175, 0.08, 0.18, "sine"), 120);
   try{ navigator.vibrate && navigator.vibrate(40); }catch(e){}
 }
-// Prime audio context on first user interaction
+function soundErr_(){
+  beep_(220, 0.14, 0.20, "square");
+  try{ navigator.vibrate && navigator.vibrate([30,30,30]); }catch(e){}
+}
+// Prime audio context on first user interaction (important on mobile)
 document.addEventListener("pointerdown", ()=>{ ensureAudioCtx_(); }, { once:true });
 
 const listEl = document.getElementById("list");
 const searchEl = document.getElementById("search");
 const groupFilterEl = document.getElementById("groupFilter");
 const refreshBtn = document.getElementById("refreshBtn");
-const syncBtn = document.getElementById("syncBtn");
-const syncCountEl = document.getElementById("syncCount");
-const offlineStatusEl = document.getElementById("offlineStatus");
+const __syncBtn = document.getElementById("syncBtn");
+const __syncCountEl = document.getElementById("syncCount");
+const __netDotEl = document.getElementById("netDot");
 const scanBtn = document.getElementById("scanBtn");
 const groupPunchBtn = document.getElementById("groupPunchBtn");
 const autoPunchRolesBtn = document.getElementById("autoPunchRolesBtn");
@@ -553,68 +560,6 @@ function renderFromCache(){
   render(filtered, todayISO);
 }
 
-// === Offline (IndexedDB) - PUNCH uniquement ===
-function setOfflineFlag_(on){
-  try{
-    if(offlineStatusEl){
-      offlineStatusEl.classList.toggle("d-none", !on);
-    }
-  }catch(e){}
-}
-
-async function refreshSyncUi_(){
-  try{
-    if(!window.OfflineStore) return;
-    const n = await OfflineStore.queueCount();
-    if(syncCountEl) syncCountEl.textContent = String(n);
-    if(syncBtn){
-      syncBtn.classList.toggle("d-none", n <= 0);
-      syncBtn.disabled = n <= 0;
-    }
-  }catch(e){}
-}
-
-async function syncOfflineQueue_(){
-  if(!syncBtn || !window.OfflineStore) return;
-  syncBtn.disabled = true;
-  try{
-    const ops = await OfflineStore.queueList();
-    if(!ops || ops.length === 0){
-      await refreshSyncUi_();
-      return;
-    }
-    let sent = 0;
-    let already = 0;
-    const done = [];
-    for(const op of ops){
-      if(op.type !== "PUNCH") continue;
-      try{
-        const res = await apiPunch(op.volunteerId, op.dateISO);
-        if(res && res.ok){
-          sent++;
-          done.push(op.id);
-        }else if(res && res.error === "ALREADY_PUNCHED"){
-          already++;
-          done.push(op.id);
-        }else{
-          // keep in queue
-        }
-      }catch(e){
-        setOfflineFlag_(true);
-        break; // still offline
-      }
-    }
-    if(done.length){
-      await OfflineStore.queueDeleteByIds(done);
-      toast(`Synchronisation: ${sent} envoyés, ${already} déjà pointés.`);
-    }
-  }finally{
-    syncBtn.disabled = false;
-    await refreshSyncUi_();
-  }
-}
-
-
 async function load(forceReloadVolunteers = false, showOverlay = false) {
   const q = (searchEl.value || "").trim();
 
@@ -693,7 +638,14 @@ groupPunchBtn?.addEventListener("click", async ()=>{
   if(!isSuper()) return;
   // ensure we have volunteers loaded at least once
   if(!volunteersCache.length){
-    try{ await load(true, true); }catch(e){}
+    try{ await load(true, true);
+
+// Net dot + Sync button init
+try{ __checkNetworkStatus(); }catch(e){}
+try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+window.addEventListener("online", ()=> __setNetDot("online"));
+window.addEventListener("offline", ()=> __setNetDot("offline"));
+try{ __refreshSyncUi(); }catch(e){} }catch(e){}
   }
   renderGroupPunchRadios(lastGroupPunchSelection);
   groupPunchModal?.show();
@@ -732,9 +684,14 @@ autoPunchRolesBtn?.addEventListener("click", async ()=>{
     }
 
     toast(`✅ Terminé: ${res.punchedNew || 0} ajouté(s), ${res.alreadyPunched || 0} déjà pointé(s).`);
-    
-      soundOk_();
-await load(true, true);
+    await load(true, true);
+
+// Net dot + Sync button init
+try{ __checkNetworkStatus(); }catch(e){}
+try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+window.addEventListener("online", ()=> __setNetDot("online"));
+window.addEventListener("offline", ()=> __setNetDot("offline"));
+try{ __refreshSyncUi(); }catch(e){}
   }catch(e){
     console.error(e);
     toast("Erreur: " + (e?.message || "JSONP error"));
@@ -802,7 +759,7 @@ groupPunchDoBtn?.addEventListener('click', async ()=>{
 
 refreshBtn?.addEventListener("click", () => load(true, true));
 
-syncBtn?.addEventListener("click", () => syncOfflineQueue_());
+__syncBtn?.addEventListener("click", () => __syncOfflineQueue());
 
   focusSearchBtn?.addEventListener('click', ()=>{ searchEl.focus(); searchEl.select(); });
   // mobile: focus on first tap anywhere
@@ -842,18 +799,12 @@ syncBtn?.addEventListener("click", () => syncOfflineQueue_());
           res = await apiPunch(id, todayISO);
         }catch(e){
           if(OfflineStore?.isLikelyOffline?.(e)){
-            setOfflineFlag_(true);
-            try{
-              await OfflineStore.enqueuePunch(id, todayISO, "button");
-              toast("Enregistré hors-ligne");
-              await refreshSyncUi_();
-              // refresh UI from local cache (optimistic)
-              try{ if(todayPunchesCache){ todayPunchesCache.set(String(id), new Date().toISOString()); } }catch(e){}
-              try{ renderFromCache(); }catch(e){}
-              return;
-            }catch(_e){
-              // fallthrough
-            }
+            try{ await OfflineStore.enqueuePunch(id, todayISO, "button"); }catch(_e){}
+            try{ punchedMap?.set(String(id), new Date().toISOString()); }catch(_e){}
+            toast("Enregistré hors-ligne");
+            try{ await __refreshSyncUi(); }catch(_e){}
+            try{ renderFromCache(); }catch(_e){}
+            return;
           }
           throw e;
         }
@@ -862,8 +813,8 @@ syncBtn?.addEventListener("click", () => syncOfflineQueue_());
           else if(res.error === "NOT_AUTHENTICATED"){ logout(); return; }
           else toast("Erreur: " + (res.error || "UNKNOWN"));
         }else{
-          try{ soundOk_(); }catch(e){}
           toast("✅ Pointage enregistré");
+      soundOk_();
         }
         todayISO = await refreshTodayPunches();
         todayEl.textContent = `Aujourd'hui : ${todayISO}`;
@@ -898,6 +849,13 @@ syncBtn?.addEventListener("click", () => syncOfflineQueue_());
           toast("✅ Bénévole supprimé");
           // Reload volunteers from backend then refresh UI
           await load(true, true);
+
+// Net dot + Sync button init
+try{ __checkNetworkStatus(); }catch(e){}
+try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+window.addEventListener("online", ()=> __setNetDot("online"));
+window.addEventListener("offline", ()=> __setNetDot("offline"));
+try{ __refreshSyncUi(); }catch(e){}
         }
       }
 
@@ -1014,11 +972,13 @@ logoutBtn?.addEventListener("click", logout);
             punchRes = await apiPunch(res.id, dateISO_);
           }catch(e){
             if(OfflineStore?.isLikelyOffline?.(e)){
-              setOfflineFlag_(true);
-              try{ await OfflineStore.enqueuePunch(res.id, dateISO_, "button-add"); await refreshSyncUi_(); punchMsg = " (enregistré hors-ligne)"; }
-              catch(_e){}
+              try{ await OfflineStore.enqueuePunch(res.id, dateISO_, "button-add"); }catch(_e){}
+              try{ punchedMap?.set(String(res.id), new Date().toISOString()); }catch(_e){}
+              try{ await __refreshSyncUi(); }catch(_e){}
               punchRes = { ok: true, offline: true };
-            }else{ throw e; }
+            }else{
+              throw e;
+            }
           }
           if(!punchRes.ok){
             if(punchRes.error === "ALREADY_PUNCHED"){
@@ -1168,8 +1128,98 @@ function applyPlanningUI(){
 
 
 
+// ===== Offline queue (PUNCH) + Sync UI (added) =====
+function __setNetDot(state){
+  if(!__netDotEl) return;
+  __netDotEl.classList.remove("net-online","net-offline","net-unknown");
+  if(state === "online"){ __netDotEl.classList.add("net-online"); __netDotEl.title="En ligne"; }
+  else if(state === "offline"){ __netDotEl.classList.add("net-offline"); __netDotEl.title="Hors-ligne"; }
+  else { __netDotEl.classList.add("net-unknown"); __netDotEl.title="Connexion"; }
+}
+
+async function __checkNetworkStatus(){
+  try{
+    if(!navigator.onLine){ __setNetDot("offline"); return; }
+    await apiMe();
+    __setNetDot("online");
+  }catch(e){
+    __setNetDot("offline");
+  }
+}
+
+async function __refreshSyncUi(){
+  try{
+    if(!__syncBtn || !window.OfflineStore) return;
+    const n = await OfflineStore.queueCount();
+    if(__syncCountEl) __syncCountEl.textContent = String(n);
+    __syncBtn.classList.toggle("d-none", n <= 0);
+    __syncBtn.disabled = n <= 0;
+  }catch(e){}
+}
+
+async function __mergeQueuedIntoPunchMap(dateISO){
+  try{
+    if(!window.OfflineStore || !punchedMap) return;
+    const ops = await OfflineStore.queueList();
+    const d = String(dateISO||"");
+    for(const op of (ops||[])){
+      if(op && op.type === "PUNCH" && String(op.dateISO||"") === d){
+        const vid = String(op.volunteerId);
+        if(vid && !punchedMap.get(vid)){
+          punchedMap.set(vid, new Date().toISOString());
+        }
+      }
+    }
+  }catch(e){}
+}
+
+async function __syncOfflineQueue(){
+  if(!__syncBtn || !window.OfflineStore) return;
+  __syncBtn.disabled = true;
+  try{
+    const ops = await OfflineStore.queueList();
+    if(!ops || ops.length === 0){ await __refreshSyncUi(); return; }
+
+    let sent = 0, already = 0;
+    const done = [];
+
+    for(const op of ops){
+      if(!op || op.type !== "PUNCH") continue;
+      try{
+        const res = await apiPunch(op.volunteerId, op.dateISO);
+        if(res && res.ok){ sent++; done.push(op.id); }
+        else if(res && res.error === "ALREADY_PUNCHED"){ already++; done.push(op.id); }
+      }catch(e){
+        // still offline -> stop
+        break;
+      }
+    }
+
+    if(done.length){
+      await OfflineStore.queueDeleteByIds(done);
+      toast(`Synchronisation: ${sent} envoyés, ${already} déjà pointés.`);
+    }
+
+    try{
+      await refreshTodayPunches();
+      await __mergeQueuedIntoPunchMap(isoDate(new Date()));
+      renderFromCache();
+    }catch(e){}
+  }finally{
+    __syncBtn.disabled = false;
+    await __refreshSyncUi();
+  }
+}
+
 requireAdmin();
 bindUI();
 applyRoleUI();
 applyPlanningUI();
 load(true, true);
+
+// Net dot + Sync button init
+try{ __checkNetworkStatus(); }catch(e){}
+try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+window.addEventListener("online", ()=> __setNetDot("online"));
+window.addEventListener("offline", ()=> __setNetDot("offline"));
+try{ __refreshSyncUi(); }catch(e){}

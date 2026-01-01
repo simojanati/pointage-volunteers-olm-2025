@@ -301,3 +301,10 @@ code{
 /* fallback if no bootstrap warning */
 .btn-warning{ background:#f6d365; border-color:#f6d365; color:#111; }
 .btn-warning:hover{ filter:brightness(0.95); }
+
+
+/* Net status dot (online/offline) */
+.net-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset;}
+.net-online{background:#22c55e;}
+.net-offline{background:#ef4444;}
+.net-unknown{background:#f59e0b;}
