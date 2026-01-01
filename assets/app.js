@@ -73,15 +73,40 @@ function plannedGroupForDate(dateISO){
   return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
 }
 
+
 function renderUserPill(){
   const el = document.getElementById("userPill");
   if(!el) return;
+
+  // Ensure netDot exists inside the pill (left)
+  let dot = el.querySelector("#netDot");
+  if(!dot){
+    dot = document.createElement("span");
+    dot.id = "netDot";
+    dot.className = "net-dot net-unknown";
+    dot.title = "Connexion";
+    el.prepend(dot);
+  }
 
   const u = localStorage.getItem("username") || "—";
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  // Remove everything except dot
+  Array.from(el.childNodes).forEach(n => {
+    if(n !== dot) el.removeChild(n);
+  });
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "me-2 user-name";
+  nameSpan.textContent = String(u);
+
+  const roleSpan = document.createElement("span");
+  roleSpan.className = `badge ${roleClass}`;
+  roleSpan.textContent = String(r);
+
+  el.appendChild(nameSpan);
+  el.appendChild(roleSpan);
 
   // Always keep pill on the left of the first visible action button (Rapports/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
@@ -97,6 +122,7 @@ function renderUserPill(){
     }
   }catch(e){}
 }
+
 
 
 const pageLoaderEl = document.getElementById("pageLoader");

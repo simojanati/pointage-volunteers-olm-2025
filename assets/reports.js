@@ -1,27 +1,64 @@
+
 function renderUserPill(){
   const el = document.getElementById("userPill");
   if(!el) return;
+
+  // Ensure netDot exists inside the pill (left)
+  let dot = el.querySelector("#netDot");
+  if(!dot){
+    dot = document.createElement("span");
+    dot.id = "netDot";
+    dot.className = "net-dot net-unknown";
+    dot.title = "Connexion";
+    el.prepend(dot);
+  }
 
   const u = localStorage.getItem("username") || "—";
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  // Remove everything except dot
+  Array.from(el.childNodes).forEach(n => {
+    if(n !== dot) el.removeChild(n);
+  });
 
-  // Always keep pill on the left of the first visible action button (Rapports/Pointage/Déconnexion).
-  const actions = document.getElementById("navActions") || el.parentElement;
-  if(!actions) return;
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "me-2 user-name";
+  nameSpan.textContent = String(u);
 
-  const candidates = Array.from(actions.querySelectorAll("a,button"))
-    .filter(x => x.id !== "userPill" && x.offsetParent !== null);
+  const roleSpan = document.createElement("span");
+  roleSpan.className = `badge ${roleClass}`;
+  roleSpan.textContent = String(r);
 
-  const first = candidates[0];
-  try{
-    if(first){
-      actions.insertBefore(el, first);
-    }
-  }catch(e){}
+  el.appendChild(nameSpan);
+  el.appendChild(roleSpan);
+
 }
+
+// Net dot (online/offline) --------------------------------------------------
+const __netDotEl = document.getElementById("netDot");
+function __setNetDot(state){
+  if(!__netDotEl) return;
+  __netDotEl.classList.remove("net-online","net-offline","net-unknown");
+  if(state === "online") __netDotEl.classList.add("net-online");
+  else if(state === "offline") __netDotEl.classList.add("net-offline");
+  else __netDotEl.classList.add("net-unknown");
+}
+async function __checkNetworkStatus(){
+  try{
+    if(!navigator.onLine){ __setNetDot("offline"); return; }
+    // ping API (authenticated pages)
+    if(typeof apiMe === "function"){
+      await apiMe();
+    }
+    __setNetDot("online");
+  }catch(e){
+    __setNetDot("offline");
+  }
+}
+// --------------------------------------------------------------------------
+
+
 
 
 
@@ -1447,7 +1484,12 @@ function periodLabel(from, to){
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  setDefaultDates();
+  
+  try{ __checkNetworkStatus(); }catch(e){}
+  try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+  window.addEventListener("online", ()=> __setNetDot("online"));
+  window.addEventListener("offline", ()=> __setNetDot("offline"));
+setDefaultDates();
   if(loadBtn){
     loadBtn.addEventListener("click", load);
   }

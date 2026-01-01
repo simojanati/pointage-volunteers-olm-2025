@@ -199,18 +199,15 @@ async function punchVolunteerAfterAssign(v, rawCode){
     }catch(e){
       if(OfflineStore?.isLikelyOffline?.(e)){
         try{ await OfflineStore.enqueuePunch(v.id, today, 'scan'); }catch(_e){}
-        setStatus(`✅ Enregistré hors-ligne : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
         playSuccessBeep();
-        toast('✅ Enregistré hors-ligne');
+        __showScanSuccessOverlay_('Enregistré hors-ligne');
         return;
       }
       throw e;
     }
     if(res?.ok){
-      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
       playSuccessBeep();
-      toast('✅ Pointage enregistré');
-    soundOk_();
+      __showScanSuccessOverlay_('');
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
@@ -227,6 +224,13 @@ async function punchVolunteerAfterAssign(v, rawCode){
     setStatus(`❌ Erreur: ${escapeHtml(res?.error || 'UNKNOWN')}`, 'danger');
     toast('Erreur');
   }catch(e){
+    const offline = (!navigator.onLine) || (OfflineStore?.isLikelyOffline?.(e));
+    if(offline){
+      try{ await OfflineStore.enqueuePunch(v.id, today, 'scan'); }catch(_e){}
+      playSuccessBeep();
+      __showScanSuccessOverlay_('Enregistré hors-ligne');
+      return;
+    }
     setStatus('❌ Erreur API (Apps Script).', 'danger');
     toast('Erreur API');
   }
@@ -358,14 +362,67 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s]));
 }
 
+
 function renderUserPill(){
-  const el = document.getElementById('userPill');
+  const el = document.getElementById("userPill");
   if(!el) return;
-  const u = localStorage.getItem('username') || '—';
-  const r = (localStorage.getItem('role') || '—').toUpperCase();
-  const roleClass = r === 'SUPER_ADMIN' ? 'badge-role-super' : (r === 'ADMIN' ? 'badge-role-admin' : 'badge-role-unknown');
-  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(u)}</span><span class="badge ${roleClass}">${escapeHtml(r)}</span>`;
+
+  // Ensure netDot exists inside the pill (left)
+  let dot = el.querySelector("#netDot");
+  if(!dot){
+    dot = document.createElement("span");
+    dot.id = "netDot";
+    dot.className = "net-dot net-unknown";
+    dot.title = "Connexion";
+    el.prepend(dot);
+  }
+
+  const u = localStorage.getItem("username") || "—";
+  const r = (localStorage.getItem("role") || "—").toUpperCase();
+  const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
+
+  // Remove everything except dot
+  Array.from(el.childNodes).forEach(n => {
+    if(n !== dot) el.removeChild(n);
+  });
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "me-2 user-name";
+  nameSpan.textContent = String(u);
+
+  const roleSpan = document.createElement("span");
+  roleSpan.className = `badge ${roleClass}`;
+  roleSpan.textContent = String(r);
+
+  el.appendChild(nameSpan);
+  el.appendChild(roleSpan);
+
 }
+
+// Net dot (online/offline) --------------------------------------------------
+const __netDotEl = document.getElementById("netDot");
+function __setNetDot(state){
+  if(!__netDotEl) return;
+  __netDotEl.classList.remove("net-online","net-offline","net-unknown");
+  if(state === "online") __netDotEl.classList.add("net-online");
+  else if(state === "offline") __netDotEl.classList.add("net-offline");
+  else __netDotEl.classList.add("net-unknown");
+}
+async function __checkNetworkStatus(){
+  try{
+    if(!navigator.onLine){ __setNetDot("offline"); return; }
+    // ping API (authenticated pages)
+    if(typeof apiMe === "function"){
+      await apiMe();
+    }
+    __setNetDot("online");
+  }catch(e){
+    __setNetDot("offline");
+  }
+}
+// --------------------------------------------------------------------------
+
+
 
 renderUserPill();
 logoutBtn?.addEventListener('click', logout);
@@ -443,6 +500,50 @@ async function loadVolunteers(){
   }
 }
 
+
+// Success overlay (image) ---------------------------------------------------
+let __scanSuccessOverlayEl = null;
+let __scanSuccessHideTimer = null;
+
+function __ensureScanSuccessOverlay_(){
+  if(__scanSuccessOverlayEl) return __scanSuccessOverlayEl;
+  const ov = document.createElement('div');
+  ov.id = 'scanSuccessOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9999;';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
+  const img = document.createElement('img');
+  img.src = './assets/qr-code-succes.png';
+  img.alt = 'Succès';
+  img.style.cssText = 'max-width:220px;width:60vw;height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.55));';
+  const cap = document.createElement('div');
+  cap.id = 'scanSuccessOverlayCaption';
+  cap.style.cssText = 'margin-top:10px;font-size:.95rem;color:#fff;opacity:.92;text-shadow:0 2px 10px rgba(0,0,0,.55);display:none;';
+  wrap.appendChild(img);
+  wrap.appendChild(cap);
+  ov.appendChild(wrap);
+  document.body.appendChild(ov);
+  __scanSuccessOverlayEl = ov;
+  return ov;
+}
+
+function __showScanSuccessOverlay_(caption){
+  const ov = __ensureScanSuccessOverlay_();
+  const cap = ov.querySelector('#scanSuccessOverlayCaption');
+  try{
+    const txt = caption ? String(caption) : '';
+    if(cap){
+      cap.textContent = txt;
+      cap.style.display = txt ? 'block' : 'none';
+    }
+  }catch(e){}
+  ov.style.display = 'flex';
+  if(__scanSuccessHideTimer) clearTimeout(__scanSuccessHideTimer);
+  __scanSuccessHideTimer = setTimeout(()=>{
+    try{ ov.style.display = 'none'; }catch(e){}
+  }, 1800);
+}
+// --------------------------------------------------------------------------
 function setStatus(html, kind){
   if(!scanStatusEl) return;
   // Requested UX: only two colors (green/red)
@@ -629,8 +730,8 @@ async function processCode(rawCode, source='scan'){
   try{
     const res = await apiPunch(v.id, today);
     if(res?.ok){
-      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
-      toast('✅ Pointage enregistré');
+      playSuccessBeep();
+      __showScanSuccessOverlay_('');
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
@@ -647,6 +748,13 @@ async function processCode(rawCode, source='scan'){
     setStatus(`❌ Erreur: ${escapeHtml(res?.error || 'UNKNOWN')}`, 'danger');
     toast('Erreur');
   }catch(e){
+    const offline = (!navigator.onLine) || (OfflineStore?.isLikelyOffline?.(e));
+    if(offline){
+      try{ await OfflineStore.enqueuePunch(v.id, today, 'scan'); }catch(_e){}
+      playSuccessBeep();
+      __showScanSuccessOverlay_('Enregistré hors-ligne');
+      return;
+    }
     setStatus('❌ Erreur API (Apps Script).', 'danger');
     toast('Erreur API');
   }
@@ -697,7 +805,7 @@ manualCodeEl?.addEventListener('keydown', async (e)=>{
 });
 
 // Démarrage manuel (nécessaire pour activer le son / vibration sur mobile)
-setStatus('Cliquez sur “Démarrer” pour lancer la caméra. (Astuce : HTTPS est requis)', 'ok');
+setStatus('', 'ok');
 
 // AUTO_START_SCAN: tentative de démarrage automatique (si le navigateur l'autorise)
 try{
@@ -707,3 +815,8 @@ try{
     }catch(e){}
   }, 350);
 }catch(e){}
+
+try{ __checkNetworkStatus(); }catch(e){}
+try{ setInterval(()=>{ try{ __checkNetworkStatus(); }catch(e){} }, 8000); }catch(e){}
+window.addEventListener('online', ()=> __setNetDot('online'));
+window.addEventListener('offline', ()=> __setNetDot('offline'));
