@@ -1,5 +1,6 @@
 
-// === Feedback scan (son + overlay) ===
+
+// === Scan success feedback (sound + overlay) ===
 let __scanAudioCtx = null;
 function __ensureScanAudioCtx_(){
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -8,7 +9,7 @@ function __ensureScanAudioCtx_(){
   try{ if(__scanAudioCtx.state === "suspended") __scanAudioCtx.resume().catch(()=>{}); }catch(e){}
   return __scanAudioCtx;
 }
-// prime audio on first user gesture (Start button / tap)
+// prime silently on first user interaction (no UI)
 document.addEventListener("pointerdown", ()=>{ __ensureScanAudioCtx_(); }, { once:true });
 
 function __beepScanOk_(){
@@ -51,7 +52,6 @@ function __beepScanOk_(){
 }
 
 let __scanOverlayEl = null;
-let __scanOverlayCaptionEl = null;
 let __scanOverlayTimer = null;
 
 function __showScanSuccessOverlay_(caption){
@@ -62,27 +62,27 @@ function __showScanSuccessOverlay_(caption){
       wrap.style.cssText =
         "position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;" +
         "background:rgba(0,0,0,.18);";
-      const box = document.createElement("div");
-      box.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:10px;";
       const img = document.createElement("img");
       img.src = "assets/qr-code-succes.png";
       img.alt = "Succès";
       img.style.cssText = "width:min(240px,72vw);height:auto;filter:drop-shadow(0 10px 24px rgba(0,0,0,.35));";
+      wrap.appendChild(img);
       const cap = document.createElement("div");
-      cap.style.cssText = "font-size:.95rem;color:#fff;opacity:.92;text-shadow:0 2px 10px rgba(0,0,0,.55);";
-      cap.textContent = "";
-      box.appendChild(img);
-      box.appendChild(cap);
-      wrap.appendChild(box);
+      cap.id = "scanSuccessOverlayCaption";
+      cap.style.cssText = "margin-top:10px;font-size:.95rem;color:#fff;opacity:.92;text-shadow:0 2px 10px rgba(0,0,0,.55);";
+      wrap.appendChild(cap);
       __scanOverlayEl = wrap;
-      __scanOverlayCaptionEl = cap;
       document.body.appendChild(__scanOverlayEl);
     }
-    if(__scanOverlayCaptionEl){
-      __scanOverlayCaptionEl.textContent = caption ? String(caption) : "";
-      __scanOverlayCaptionEl.style.display = caption ? "block" : "none";
-    }
     __scanOverlayEl.style.display = "flex";
+    try{
+      const cap = document.getElementById("scanSuccessOverlayCaption");
+      if(cap){
+        const txt = caption ? String(caption) : "";
+        cap.textContent = txt;
+        cap.style.display = txt ? "block" : "none";
+      }
+    }catch(e){}
     if(__scanOverlayTimer) clearTimeout(__scanOverlayTimer);
     __scanOverlayTimer = setTimeout(()=>{ try{ __scanOverlayEl.style.display='none'; }catch(e){} }, 2000);
   }catch(e){}
@@ -387,10 +387,9 @@ async function processCode(rawCode, source='scan'){
   try{
     const res = await apiPunch(v.id, today);
     if(res?.ok){
-      setStatus(`✅ Pointage enregistré : <b>${escapeHtml(v.fullName||'')}</b>`, 'success');
-      toast('✅ Pointage enregistré');
+      // Succès: son + image uniquement (pas de message texte)
       __beepScanOk_();
-      __showScanSuccessOverlay_('');
+      __showScanSuccessOverlay_("");
       return;
     }
     if(res?.error === 'ALREADY_PUNCHED'){
@@ -407,20 +406,21 @@ async function processCode(rawCode, source='scan'){
     setStatus(`❌ Erreur: ${escapeHtml(res?.error || 'UNKNOWN')}`, 'danger');
     toast('Erreur');
   }catch(e){
-    // Hors-ligne: on enfile le pointage + feedback visuel
-    try{
-      await OfflineStore?.enqueuePunch?.(v.id, today, "scan");
-      setStatus(`✅ Enregistré hors-ligne : <b>${escapeHtml(v.fullName||'')}</b>`, 'warning');
-      toast('Enregistré hors-ligne');
-      __beepScanOk_();
-      __showScanSuccessOverlay_('Enregistré hors-ligne');
-      return;
-    }catch(_e){
-      setStatus('❌ Erreur API (Apps Script).', 'danger');
-      toast('Erreur API');
+    if(OfflineStore?.isLikelyOffline?.(e)){
+      try{
+        await OfflineStore.enqueuePunch(v.id, today, \"scan\");
+        setStatus(`✅ Enregistré hors-ligne : <b>${escapeHtml(v.fullName||\'\')}</b>`, \'warning\');
+        toast(\'Enregistré hors-ligne\');
+        __beepScanOk_();
+        __showScanSuccessOverlay_(\'Enregistré hors-ligne\');
+        return;
+      }catch(_e){
+        // fallback
+      }
     }
+    setStatus(\'❌ Erreur API (Apps Script).\', \'danger\');
+    toast(\'Erreur API\');
   }
-}
 }
 
 function onScanSuccess(decodedText){

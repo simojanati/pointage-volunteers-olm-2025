@@ -5,11 +5,17 @@ function getSessionToken(){
 function jsonpRequest(params) {
   const { API_URL, TOKEN } = window.POINTAGE_CONFIG || {};
   if (!API_URL || API_URL.includes("PASTE_")) throw new Error("API_URL not configured");
-  if (!TOKEN || TOKEN.includes("PASTE_")) throw new Error("TOKEN not configured");
 
-  // attach sessionToken to every request except login
-  if (params?.action !== "login") {
-    params.sessionToken = params.sessionToken || getSessionToken();
+  const action = String(params?.action || "");
+  const isPublicAction = action.startsWith("public");
+
+  // Token requis uniquement pour les actions privées/admin
+  if (!isPublicAction) {
+    if (!TOKEN || TOKEN.includes("PASTE_")) throw new Error("TOKEN not configured");
+    // attach sessionToken to every request except login
+    if (action !== "login") {
+      params.sessionToken = params.sessionToken || getSessionToken();
+    }
   }
 
   return new Promise((resolve, reject) => {
@@ -20,7 +26,8 @@ function jsonpRequest(params) {
       resolve(data);
     };
 
-    const q = new URLSearchParams({ token: TOKEN, callback: cb, ...params });
+    const baseParams = isPublicAction ? { callback: cb, ...params } : { token: TOKEN, callback: cb, ...params };
+    const q = new URLSearchParams(baseParams);
     const script = document.createElement("script");
     script.src = `${API_URL}?${q.toString()}`;
     script.onerror = () => {
@@ -39,6 +46,11 @@ async function apiListVolunteers(search="") {
 
 async function apiPunch(volunteerId, dateISO) {
   return jsonpRequest({ action:"punch", volunteerId: String(volunteerId), date: dateISO });
+}
+
+// SUPER_ADMIN: punch all volunteers of a group for a date (YYYY-MM-DD)
+async function apiPunchGroup(group, dateISO){
+  return jsonpRequest({ action:"punchGroup", group: String(group||""), date: String(dateISO||"") });
 }
 
 async function apiReportSummary(fromISO, toISO) {
@@ -70,6 +82,19 @@ async function apiUpdateVolunteer(id, fullName, badgeCode="", qrCode="", phone="
   return jsonpRequest({ action:"updateVolunteer", id: String(id), fullName, badgeCode, qrCode, phone, group });
 }
 
+async function apiDeleteVolunteer(id){
+  return jsonpRequest({ action:"deleteVolunteer", id: String(id) });
+}
+
+
+function apiAssignQrCode(volunteerId, qrCode){
+  return jsonpRequest({ action:"assignQrCode", volunteerId: String(volunteerId), qrCode: String(qrCode || "") });
+}
+
+
+function apiListLogs(limit=500){
+  return jsonpRequest({ action:"listLogs", limit: String(limit) });
+}
 
 async function apiLogin(username, pin){
   return jsonpRequest({ action:"login", username, pin });
@@ -90,9 +115,29 @@ async function apiVolunteerHistory(volunteerId, from, to){
 
 // Public (no login) - used by viewer.html
 async function apiPublicListVolunteers(search=""){
-  return jsonpRequest({ action:"publicListVolunteers", search });
+  let res = await jsonpRequest({ action:"publicListVolunteers", search });
+  if(res && res.ok) return res;
+  // compat: anciens noms
+  if(res && String(res.error||"") === "UNKNOWN_ACTION"){
+    res = await jsonpRequest({ action:"public_list_volunteers", search });
+    if(res && res.ok) return res;
+  }
+  return res;
 }
 
 async function apiPublicVolunteerHistory(volunteerId, from="", to=""){
-  return jsonpRequest({ action:"publicVolunteerHistory", volunteerId: String(volunteerId||""), from, to });
+  let res = await jsonpRequest({ action:"publicVolunteerHistory", volunteerId: String(volunteerId||""), from, to });
+  if(res && res.ok) return res;
+  if(res && String(res.error||"") === "UNKNOWN_ACTION"){
+    res = await jsonpRequest({ action:"public_volunteer_history", volunteerId: String(volunteerId||""), from, to });
+    if(res && res.ok) return res;
+  }
+  return res;
+}
+
+
+async function apiRunAutoPunchRoles(dryRun=false, date=""){
+  const payload = { action:"runAutoPunchRoles" };
+  if(date) payload.date = String(date);
+  return jsonpRequest(payload);
 }

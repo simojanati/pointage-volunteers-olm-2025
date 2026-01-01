@@ -37,15 +37,19 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h2 class="h5 mb-1 text-white">Volontaires : 12h - 18h</h2>
+            <h2 id="pageTitle" class="h5 mb-1 text-white">Volontaires : 15h - 19h</h2>
             <div id="today" class="text-muted2 small"></div>
           </div>
-          <div class="d-flex align-items-center gap-2">
+          <div id="adminActions" class="d-flex align-items-center gap-2 flex-wrap">
             <span class="badge badge-soft text-white" id="countPill">0</span>
             <button id="scanBtn" class="btn btn-outline-light btn-sm">📷 Scanner</button>
-            <button id="refreshBtn" class="btn btn-outline-light btn-sm">Actualiser</button>
+            <button id="groupPunchBtn" class="btn btn-outline-light btn-sm" data-super-only>👥 Pointage par groupe</button>
+            <button id="autoPunchRolesBtn" class="btn btn-warning btn-sm d-none" data-admin-only title="Pointer automatiquement les responsables (role renseigné) à 15h — ignore ceux déjà pointés">👑 Pointer responsables</button>
+            <span id="autoPunchRolesDone" class="badge bg-success d-none" title="Tous les responsables sont pointés pour aujourd\'hui">✅ Responsables pointés</span>
+            <span id="autoPunchRolesStatus" class="ms-2 d-none text-success fw-semibold"><span class="me-1">✅</span>Responsables pointés</span>
             <span id="offlineStatus" class="badge bg-warning text-dark ms-2 d-none">Hors-ligne</span>
             <button id="syncBtn" class="btn btn-warning btn-sm ms-2 d-none">🔄 Synchroniser (<span id="syncCount">0</span>)</button>
+            <button id="refreshBtn" class="btn btn-outline-light btn-sm">Actualiser</button>
           </div>
         </div>
 
@@ -59,8 +63,7 @@
             <select id="groupFilter" class="form-select bg-dark text-white border-0">
               <option value="">Tous les groupes</option>
               <option value="A">Groupe A</option>
-              <option value="B">Groupe B</option>
-            </select>
+              <option value="B">Groupe B</option>            </select>
           </div>
 
           <div class="col-3 col-md-2 d-grid">
@@ -124,8 +127,6 @@
                 <tr>
                   <th style="min-width:130px;">Date</th>
                   <th style="min-width:90px;">Heure</th>
-                  <th>Nom</th>
-                  <th style="min-width:140px;">Badge</th>
                 </tr>
               </thead>
               <tbody id="histTbody">
@@ -138,6 +139,32 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline-light" data-bs-dismiss="modal">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pointage par groupe Modal (SUPER ADMIN) -->
+  <div class="modal fade" id="groupPunchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-light border-opacity-25">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title mb-0">Pointage par groupe</h5>
+            <div class="small text-muted2">Sélectionnez un groupe puis pointez tous les volontaires du groupe en une seule fois.</div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="small text-muted2 mb-2">Groupe</div>
+          <div id="groupPunchRadios" class="d-flex flex-wrap gap-3"></div>
+
+          <div id="groupPunchHint" class="small text-muted2 mt-3"></div>
+          <div id="groupPunchMsg" class="small mt-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-light" data-bs-dismiss="modal">Annuler</button>
+          <button id="groupPunchDoBtn" class="btn btn-primary">Pointer en masse</button>
         </div>
       </div>
     </div>
@@ -193,8 +220,24 @@
                   <input class="form-check-input" type="radio" name="groupAdd" id="groupAddB" value="B">
                   <span class="form-check-label">B</span>
                 </label>
+                <label class="form-check text-white">                </label>
               </div>
               <input type="hidden" id="group" value="A">
+            </div>
+
+            <div>
+              <label class="form-label small text-muted2 mb-1">Pointer maintenant&nbsp;?</label>
+              <div class="d-flex gap-3 mt-1">
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="punchNowAdd" id="punchNowNo" value="no" checked>
+                  <span class="form-check-label">Non</span>
+                </label>
+                <label class="form-check text-white">
+                  <input class="form-check-input" type="radio" name="punchNowAdd" id="punchNowYes" value="yes">
+                  <span class="form-check-label">Oui</span>
+                </label>
+              </div>
+              <div class="form-text text-muted2">Si «&nbsp;Oui&nbsp;», le pointage du jour sera enregistré automatiquement après l'ajout.</div>
             </div>
         </div>
 
@@ -255,6 +298,7 @@
                   <input class="form-check-input" type="radio" name="groupEdit" id="groupEditB" value="B">
                   <span class="form-check-label">B</span>
                 </label>
+                <label class="form-check text-white">                </label>
               </div>
               <input type="hidden" id="editGroup" value="A">
             </div>

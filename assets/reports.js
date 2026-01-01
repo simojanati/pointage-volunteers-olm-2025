@@ -6,7 +6,7 @@ function renderUserPill(){
   const r = (localStorage.getItem("role") || "—").toUpperCase();
   const roleClass = r === "SUPER_ADMIN" ? "badge-role-super" : (r === "ADMIN" ? "badge-role-admin" : "badge-role-unknown");
 
-  el.innerHTML = `<span class="me-2">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
+  el.innerHTML = `<span class="me-2 user-name">${escapeHtml(String(u))}</span><span class="badge ${roleClass}">${escapeHtml(String(r))}</span>`;
 
   // Always keep pill on the left of the first visible action button (Rapports/Pointage/Déconnexion).
   const actions = document.getElementById("navActions") || el.parentElement;
@@ -24,6 +24,11 @@ function renderUserPill(){
 }
 
 
+
+function isSuperAdmin(){
+  return String(localStorage.getItem("role") || "").toUpperCase() === "SUPER_ADMIN";
+}
+
 function normGroup(g){
   return String(g ?? "").trim().toUpperCase();
 }
@@ -31,6 +36,21 @@ function normGroup(g){
 function rowGroup(r){
   return normGroup(r?.group || r?.groupe || "");
 }
+
+
+function activeOffGroupForDate(rows, dateISO){
+  let a = 0, b = 0;
+  for(const r of (rows||[])){
+    if(String(r.punch_date||"") !== String(dateISO||"")) continue;
+    const g = rowGroup(r);
+    if(g === "A") a++;
+    else if(g === "B") b++;
+  }
+  const active = (a >= b) ? "A" : "B";
+  const off = (active === "A") ? "B" : "A";
+  return { active, off, countA: a, countB: b };
+}
+
 function volGroup(v){
   return normGroup(v?.group || v?.groupe || "");
 }
@@ -48,23 +68,104 @@ function applyGroupFilter(){
   // Keep backward-compatible vars
   lastVolunteersFiltered = filteredVolunteers;
   lastRows = filteredRows;
+
+  // RAW references (unfiltered by group)
+  if(!Array.isArray(lastRowsRaw) || !lastRowsRaw.length) lastRowsRaw = (rawRows || []).slice();
+  if(!Array.isArray(lastVolunteersRaw) || !lastVolunteersRaw.length) lastVolunteersRaw = (rawVolunteers || []).slice();
+}
+
+function formatPhoneForUi_(raw){
+  const v = String(raw||"").trim();
+  if(!v) return "";
+  if(v.startsWith('+')) return v;
+  const digits = v.replace(/[^0-9]/g,'');
+  if(!digits) return v;
+  if(digits.startsWith('212')) return '+' + digits;
+  if(digits.startsWith('0')) return '+212' + digits.substring(1);
+  return '+212' + digits;
 }
 
 function escapeHtml(s){
   return String(s ?? "").replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
+
+function formatPhoneForPdf(phone){
+  const p = String(phone || "").trim();
+  if(!p) return "";
+  const cleaned = p.replace(/\s+/g, "");
+  if(cleaned.startsWith("+")) return cleaned;
+  if(cleaned.startsWith("0")) return "+212" + cleaned.slice(1);
+  if(cleaned.startsWith("212")) return "+212" + cleaned.slice(3);
+  return "+212" + cleaned;
+}
+
+
+
+// --- PDF helpers (shared) ---
+async function loadAssetDataUrl(path){
+  // Returns a data: URL (image/png) for a local asset path.
+  // Works on https/http. For file://, falls back to <img> + canvas.
+  const toPngDataUrl = (img)=>{
+    try{
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth || img.width;
+      c.height = img.naturalHeight || img.height;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0);
+      return c.toDataURL("image/png");
+    }catch(e){
+      return null;
+    }
+  };
+
+  // file:// can't fetch reliably (CORS)
+  if(location.protocol === "file:"){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=> resolve(toPngDataUrl(img));
+      img.onerror = ()=> resolve(null);
+      img.src = path;
+    });
+  }
+
+  try{
+    const res = await fetch(path, { cache: "no-store" });
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve)=>{
+      const fr = new FileReader();
+      fr.onload = ()=> resolve(String(fr.result || ""));
+      fr.onerror = ()=> resolve(null);
+      fr.readAsDataURL(blob);
+    });
+  }catch(e){
+    return null;
+  }
+}
+
+
 const fromEl = document.getElementById("fromDate");
 const toEl = document.getElementById("toDate");
+const singleDateEl = document.getElementById("singleDate");
 const groupEl = document.getElementById("groupSelect");
 const loadBtn = document.getElementById("loadBtn");
 const exportBtn = document.getElementById("exportBtn");
 const pdfBtn = document.getElementById("pdfBtn");
+const pdfGroupedBtn = document.getElementById("pdfGroupedBtn");
+
 const totalEl = document.getElementById("totalVolunteers");
-const uniqueEl = document.getElementById("uniqueVolunteers");
-const absentsEl = document.getElementById("absents");
 const rateEl = document.getElementById("ratePct");
+const totalGroupAEl = document.getElementById("totalGroupA");
+const totalGroupBEl = document.getElementById("totalGroupB");
+const presenceGroupAEl = document.getElementById("presenceGroupA");
+const presenceGroupBEl = document.getElementById("presenceGroupB");
 const daysBody = document.getElementById("daysBody");
+const absencesMainTbody = document.getElementById("absencesMainTbody");
+const absencesMainSubEl = document.getElementById("absencesMainSub");
+const absencesMainCountEl = document.getElementById("absencesMainCount");
 const daysCount = document.getElementById("daysCount");
 const emptyMsg = document.getElementById("emptyMsg");
 const absencesModalEl = document.getElementById('absencesModal');
@@ -87,6 +188,8 @@ const dashChartCanvas = document.getElementById('dashChart');
 
 
 let lastRows = [];
+let lastRowsRaw = [];
+let lastVolunteersRaw = [];
 let allVolunteers = [];
 // RAW caches (unfiltered by group)
 let rawRows = [];
@@ -136,13 +239,15 @@ function setBtnLoading(btn, loading, label){
 
 
 function setDefaultDates(){
-  const now = new Date();
-  const to = isoDate(now);
-  const fromDate = new Date(now);
-  fromDate.setDate(fromDate.getDate() - 6);
-  fromEl.value = isoDate(fromDate);
-  toEl.value = to;
+  const today = isoDate(new Date());
+  if(singleDateEl) singleDateEl.value = today;
+  if(fromEl) fromEl.value = today;
+  if(toEl) toEl.value = today;
 }
+
+
+
+
 
 function buildDaysFromRows(rows){
   const map = {};
@@ -157,68 +262,81 @@ function buildDaysFromRows(rows){
 function renderSummary(data){
   lastSummary = data;
 
-  const _g = getSelectedGroup();
-  const total = _g ? Number((filteredVolunteers||[]).length) : Number(data.totalVolunteers || 0);
+  // KPI (date unique) — basé sur le planning (groupe actif du jour)
+  const volsAll = Array.isArray(lastVolunteersRaw) ? lastVolunteersRaw : (rawVolunteers || []);
+  const rowsAllAll = Array.isArray(lastRowsRaw) ? lastRowsRaw : (rawRows || []);
+  const maps = buildVolunteerMaps_(volsAll);
 
-  // Days summary (sorted: newest first)
-  const days = (data.days || []).slice();
-  days.sort((a,b)=> {
-    const da = new Date(String(a.date||"") + "T00:00:00");
-    const db = new Date(String(b.date||"") + "T00:00:00");
-    if(!isNaN(da) && !isNaN(db)) return db - da;
-    return String(b.date||"").localeCompare(String(a.date||""));
-  });
+  const chosenDate = (singleDateEl && singleDateEl.value) ? singleDateEl.value : (fromEl?.value || "");
+  // sync hidden from/to for exports
+  if(fromEl) fromEl.value = chosenDate;
+  if(toEl) toEl.value = chosenDate;
 
-  const nbDays = Math.max(1, days.length);
-  daysCount.textContent = `${days.length} jours`;
+  // période info (1 jour)
+  try{  }catch(e){}
 
-  const sumPresent = days.reduce((acc,d)=> acc + Number(d.count || 0), 0);
-  const avgPresent = sumPresent / nbDays;
+  const workG = plannedGroupForDate(chosenDate);
+  const offG  = offGroupForDate(chosenDate);
 
-  const presentPct = total ? (avgPresent / total) * 100 : 0;
+  // totaux bénévoles
+  const totalA = (volsAll||[]).filter(v => volGroup(v)==="A" && String(v.id||"").trim()).length;
+  const totalB = (volsAll||[]).filter(v => volGroup(v)==="B" && String(v.id||"").trim()).length;
+  const totalAll = totalA + totalB;
 
-  const avgAbsent = Math.max(0, total - avgPresent);
-  const absentPct = total ? (avgAbsent / total) * 100 : 0;
+  if(totalEl) totalEl.textContent = totalAll;
+  if(totalGroupAEl) totalGroupAEl.textContent = totalA;
+  if(totalGroupBEl) totalGroupBEl.textContent = totalB;
 
-  // KPI
-  totalEl.textContent = total;
+  // rows du jour
+  const rowsForDay = (rowsAllAll||[]).filter(r => String(r.punch_date||"") === String(chosenDate));
 
-  // Pointés (uniques) = moyenne / jour + % + (Xj)
-  uniqueEl.textContent = `${presentPct.toFixed(2)}% (${days.length}j)`;
+  // présents uniques par groupe (selon Volunteers)
+  const presentA = new Set();
+  const presentB = new Set();
+  for(const row of rowsForDay){
+    const rid = resolveVolunteerId_(row, maps);
+    if(!rid) continue;
+    const v = maps.byId.get(rid);
+    if(!v) continue;
+    const g = volGroup(v);
+    if(g==="A") presentA.add(rid);
+    else if(g==="B") presentB.add(rid);
+  }
+  const presentCountA = presentA.size;
+  const presentCountB = presentB.size;
 
-  // Absents = moyenne / jour + % + (Xj)
-  if(absentsEl) absentsEl.textContent = `${absentPct.toFixed(2)}% (${days.length}j)`;
+  const workTotal = (workG==="A") ? totalA : totalB;
+  const offTotal  = (offG==="A") ? totalA : totalB;
+  const workPresent = (workG==="A") ? presentCountA : presentCountB;
+  const offPresent  = (offG==="A") ? presentCountA : presentCountB;
 
-  // Small badge in Absents card: show absent %
-  if(rateEl){ rateEl.textContent = ""; rateEl.style.display = "none"; }
+  const workAbsent = Math.max(0, workTotal - workPresent);
 
-  // Presence card: show presence % and days badge
+
+  // Présence: afficher ratio "présents/total" du groupe actif
   const kpiRateEl = document.getElementById("kpiRate");
-  if(kpiRateEl) kpiRateEl.textContent = `${presentPct.toFixed(2)}% (${days.length}j)`;
+  const presenceTotal = presentCountA + presentCountB;
+  if(kpiRateEl) kpiRateEl.textContent = `${presenceTotal}/${workTotal}`;
 
-  const kpiAbsentsEl = document.getElementById("kpiAbsents");
-  if(kpiAbsentsEl){ kpiAbsentsEl.textContent = ""; kpiAbsentsEl.style.display = "none"; }
+  if(presenceGroupAEl) presenceGroupAEl.textContent = `${presentCountA}/${totalA}`;
+  if(presenceGroupBEl) presenceGroupBEl.textContent = `${presentCountB}/${totalB}`;
 
-  // Render days table (newest first)
-  daysBody.innerHTML = days.map(r => {
-    const count = Number(r.count || 0);
-    const absCount = Math.max(0, total - count);
-    return `
-      <tr>
-        <td class="fw-bold">${r.date}</td>
-        <td><span class="badge text-bg-primary">${count}</span></td>
-        <td class="text-end">
-          <span class="badge badge-soft text-white abs-day-btn" role="button" tabindex="0" data-date="${r.date}" title="Voir la liste des absents">${absCount}</span>
-        </td>
-      </tr>
-    `;
-  }).join("");
+  // Absences list (affichée directement)
+  const volsWork = (volsAll||[]).filter(v => volGroup(v)===workG && String(v.id||"").trim());
+  const absentList = volsWork.filter(v => !((workG==="A") ? presentA.has(String(v.id).trim()) : presentB.has(String(v.id).trim())))
+                             .sort((a,b)=> (a.fullName||a.full_name||"").localeCompare(b.fullName||b.full_name||"", "fr"));
+
+  if(absencesMainSubEl) absencesMainSubEl.textContent = `Date : ${chosenDate} — Groupe actif : ${workG} (OFF : ${offG}) — Pointés OFF : ${offPresent}/${offTotal}`;
+  if(absencesMainCountEl) absencesMainCountEl.textContent = String(absentList.length);
+  renderAbsencesInto_(absentList, absencesMainTbody);
+
 }
+
 
 
 function bindDaysAbsences(){
   if(!daysBody) return;
-  daysBody.addEventListener("click", async (e)=>{
+  if(daysBody) daysBody.addEventListener("click", async (e)=>{
     const btn = e.target.closest(".abs-day-btn");
     if(!btn) return;
     const dateISO = btn.getAttribute("data-date");
@@ -226,11 +344,31 @@ function bindDaysAbsences(){
 
     try{
       showLoader("Chargement des absences...");
-      // Use the already filtered caches to keep counts consistent with KPIs
-      const vols = (filteredVolunteers && filteredVolunteers.length) ? filteredVolunteers : filterVolunteersByGroup(await ensureVolunteers(), getSelectedGroup());
-      const rowsForDay = (filteredRows && filteredRows.length) ? filteredRows : lastRows;
-      const list = computeAbsentsForDate(vols, rowsForDay, dateISO);
+      // Calcul basé sur le planning (indépendant du filtre)
+      const volsAll = (Array.isArray(lastVolunteersRaw) && lastVolunteersRaw.length) ? lastVolunteersRaw : await ensureVolunteers();
+      const rowsAll = (Array.isArray(lastRowsRaw) && lastRowsRaw.length) ? lastRowsRaw : (rawRows || []);
+      const rowsForDay = (rowsAll || []).filter(x => String(x.punch_date||"") === dateISO);
 
+      const workG = plannedGroupForDate(dateISO);
+      const offG  = offGroupForDate(dateISO);
+
+      const maps = buildVolunteerMaps_(volsAll);
+
+      const presentWork = new Set();
+      for(const row of (rowsForDay||[])){
+        const rid = resolveVolunteerId_(row, maps);
+        if(!rid) continue;
+        const v = maps.byId.get(rid);
+        if(volGroup(v) === workG) presentWork.add(rid);
+      }
+
+      const volsWork = (volsAll || []).filter(v => volGroup(v) === workG && String(v.id||"").trim());
+
+      const list = volsWork
+        .filter(v => !presentWork.has(String(v.id).trim()))
+        .sort((a,b)=> (a.fullName||"").localeCompare(b.fullName||"", "fr"));
+
+      if(absencesSubEl) absencesSubEl.textContent = `Absences (Groupe actif: ${workG} — OFF: ${offG})`;
       renderAbsencesList(list);
       if(absencesCountEl) absencesCountEl.textContent = String(list.length);
 
@@ -261,33 +399,49 @@ async function load(){
   bindAbsencesModal();
   bindDaysAbsences();
   renderUserPill();
-  
-  const from = fromEl.value;
-  const to = toEl.value;
-  const group = getSelectedGroup();
-  if(!from || !to) return toast("Veuillez choisir une période (du / au).");
+  showLoader("Chargement des rapports...");
+  if(loadBtn) setBtnLoading(loadBtn, true, "Chargement...");
 
-  setBtnLoading(loadBtn, true, "Chargement...");
-  showLoader("Chargement du rapport...");
+const logsBtn = document.getElementById("logsBtn");
+if(logsBtn){
+  const role = (localStorage.getItem("role") || "").toUpperCase();
+  if(role !== "SUPER_ADMIN"){
+    logsBtn.style.display = "none";
+  }else{
+    logsBtn.addEventListener("click", () => window.location.href = "logs.html");
+  }
+}
+
+  if(pdfGroupedBtn && !isSuperAdmin()) pdfGroupedBtn.style.display = "none";
+  const chosen = (singleDateEl && singleDateEl.value) ? singleDateEl.value : ((fromEl && fromEl.value) ? fromEl.value : "");
+  const from = chosen;
+  const to = chosen;
+  const group = null;
+  if(!from) return toast("Veuillez choisir une date.");
+  if(fromEl) fromEl.value = from;
+  if(toEl) toEl.value = to;
+showLoader("Chargement du rapport...");
 
   try{
-    const res = await apiReportSummary(from, to, group);
+    const res = await apiReportSummary(from, to, "");
     if(!res.ok){
       if(res.error === "NOT_AUTHENTICATED") { logout(); return; }
       throw new Error(res.error || "SUMMARY_ERROR");
     }
 
-    const pr = await apiReportPunches(from, to, group);
+    const pr = await apiReportPunches(from, to, "");
     if(!pr.ok){
       if(pr.error === "NOT_AUTHENTICATED") { logout(); return; }
       throw new Error(pr.error || "PUNCHES_ERROR");
     }
     // Keep raw (date-filtered) data then apply group filter consistently everywhere
     rawRows = pr.rows || [];
+    lastRowsRaw = (rawRows || []).slice();
 
     try{
       const volsAll = await ensureVolunteers();
       rawVolunteers = volsAll || [];
+      lastVolunteersRaw = (rawVolunteers || []).slice();
       populateGroupSelect(rawVolunteers);
     }catch(_e){
       rawVolunteers = rawVolunteers || [];
@@ -313,25 +467,28 @@ async function load(){
     toast("Erreur lors du chargement du rapport.");
   }finally{
     hideLoader();
-    setBtnLoading(loadBtn, false);
+    if(loadBtn) setBtnLoading(loadBtn, false, "Afficher");
   }
 }
 
-async function exportExcel(){
-  const from = fromEl.value;
-  const to = toEl.value;
-  const group = getSelectedGroup();
+async function exportExcel(opts=null){
+  const chosen = (singleDateEl && singleDateEl.value) ? singleDateEl.value : ((fromEl && fromEl.value) ? fromEl.value : "");
+  if(chosen){ if(fromEl) fromEl.value = chosen; if(toEl) toEl.value = chosen; }
 
-  if(!window.ExcelJS){
+  const group = getSelectedGroup();
+  const from = opts?.from || fromEl.value;
+  const to = opts?.to || toEl.value;
+if(!window.ExcelJS){
     toast("ExcelJS indisponible (réseau).");
     return;
   }
-  if(!lastRows || !lastRows.length){
+  const rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
+  if(!rowsToExport || !rowsToExport.length){
     toast("Aucune donnée à exporter.");
     return;
   }
 
-  const rowsSorted = lastRows.slice().sort((a,b)=>{
+  const rowsSorted = rowsToExport.slice().sort((a,b)=>{
     const da = String(a.punch_date||"") + " " + String(a.punched_at||"");
     const db = String(b.punch_date||"") + " " + String(b.punched_at||"");
     return db.localeCompare(da);
@@ -350,6 +507,7 @@ async function exportExcel(){
       { header: "Nom complet", key: "name", width: 32 },
       { header: "Badge", key: "badge", width: 16 },
       { header: "Téléphone", key: "phone", width: 16 },
+      { header: "Rôle", key: "role", width: 18 },
       { header: "Groupe", key: "group", width: 16 },
     ];
     const colsOne = [
@@ -358,6 +516,7 @@ async function exportExcel(){
       { header: "Nom complet", key: "name", width: 32 },
       { header: "Badge", key: "badge", width: 16 },
       { header: "Téléphone", key: "phone", width: 16 },
+      { header: "Rôle", key: "role", width: 18 },
     ];
     ws.columns = (group ? colsOne : colsAll);
 
@@ -428,7 +587,7 @@ async function exportExcel(){
     const blob = new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `rapport_pointage_${from}_${to}.xlsx`;
+    a.download = `rapport_pointage_${from}.xlsx`;
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 800);
 
@@ -443,21 +602,24 @@ async function exportExcel(){
 
 
 
-async function exportPdf(){
-  const from = fromEl.value;
-  const to = toEl.value;
-  const group = getSelectedGroup();
+async function exportPdf(opts=null){
+  const chosen = (singleDateEl && singleDateEl.value) ? singleDateEl.value : ((fromEl && fromEl.value) ? fromEl.value : "");
+  if(chosen){ if(fromEl) fromEl.value = chosen; if(toEl) toEl.value = chosen; }
 
-  if(!window.jspdf?.jsPDF){
+  const group = getSelectedGroup();
+  const from = opts?.from || fromEl.value;
+  const to = opts?.to || toEl.value;
+if(!window.jspdf?.jsPDF){
     toast("jsPDF indisponible (réseau).");
     return;
   }
-  if(!lastRows || !lastRows.length){
+  const rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
+  if(!rowsToExport || !rowsToExport.length){
     toast("Aucune donnée à exporter.");
     return;
   }
 
-  const rowsSorted = lastRows.slice().sort((a,b)=>{
+  const rowsSorted = rowsToExport.slice().sort((a,b)=>{
     const da = String(a.punch_date||"") + " " + String(a.punched_at||"");
     const db = String(b.punch_date||"") + " " + String(b.punched_at||"");
     return db.localeCompare(da);
@@ -584,34 +746,182 @@ async function exportPdf(){
       doc.setFont("helvetica","normal");
     }
 
-    const tableStartY = group ? (yTitle + 52) : (yTitle + 44);
+    // ---- Counts (top-left, above the table) ----
+    function frDate(iso){
+      const s = String(iso||"");
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+    }
+    function computeCountsByDate(rows){
+      const map = new Map(); // date -> Set(volunteer_id)
+      for(const r of (rows||[])){
+        const d = String(r.punch_date || "").trim();
+        if(!d) continue;
+        const vid = String(r.volunteer_id || r.volunteerId || "").trim();
+        if(!map.has(d)) map.set(d, new Set());
+        if(vid) map.get(d).add(vid);
+        else map.get(d).add(String(r.full_name||r.fullName||""));
+      }
+      return Array.from(map.entries())
+        .map(([date,set]) => ({ date, count: set.size }))
+        .sort((a,b)=>a.date.localeCompare(b.date));
+    }
 
-    const rows = rowsSorted.map(r => (group ? ([
-      r.punch_date || "",
-      (r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : ""),
-      r.full_name || "",
-      r.badge_code || "",
-      r.phone || ""
-    ]) : ([
-      r.punch_date || "",
-      (r.punched_at ? new Date(r.punched_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : ""),
-      r.full_name || "",
-      r.badge_code || "",
-      r.phone || "",
-      (r.group || r.groupe || "")
-    ])));
+    const counts = computeCountsByDate(rowsSorted);
+    const sameDay = (String(from||"") && String(to||"") && String(from) === String(to));
 
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(11);
+
+    let y = group ? (yTitle + 52) : (yTitle + 44);
+    const leftX = margin;
+
+    if(sameDay){
+      const n = counts[0]?.count || 0;
+      doc.text(`Nombre pointés : ${n}`, leftX, y);
+      y += 12;
+    }else{
+      doc.text(`Nombre pointés par date :`, leftX, y);
+      y += 12;
+      doc.setFont("helvetica","normal");
+      // Prevent too tall header block
+      const maxLines = 12;
+      const list = counts.slice(0, maxLines);
+      for(const c of list){
+        doc.text(`- ${frDate(c.date)} : ${c.count}`, leftX, y);
+        y += 12;
+      }
+      if(counts.length > maxLines){
+        doc.text(`- ...`, leftX, y);
+        y += 12;
+      }
+      doc.setFont("helvetica","bold");
+    }
+
+    // Start table after the counts block
+    const tableStartY = y + 8;
+    doc.setFont("helvetica","normal");
+
+    const isSameDate = !!from && !!to && String(from) === String(to);
+
+    const volsAllForRole = await ensureVolunteers();
+    const roleById = new Map((volsAllForRole||[]).map(v=>[String(v.id), String(v.role||"").trim()]));
+    const roleByBadge = new Map((volsAllForRole||[]).map(v=>[String(v.badgeCode||"").trim(), String(v.role||"").trim()]));
+    const roleForRow = (r)=>{
+      const byId = roleById.get(String(r.volunteer_id||"")) || "";
+      if(byId) return byId;
+      const b = String(r.badge_code||"").trim();
+      return (b && roleByBadge.get(b)) ? roleByBadge.get(b) : "";
+    };
+
+    const headCols = isSameDate ? ["Nom complet","Badge","Role"] : ["Date","Nom complet","Badge","Role"];
+
+    const rowsMeta = rowsSorted.map(r => {
+      const role = String(roleForRow(r) || "").trim();
+      const cells = isSameDate
+        ? [ (r.full_name || ""), (r.badge_code || ""), role ]
+        : [ (r.punch_date || ""), (r.full_name || ""), (r.badge_code || ""), role ];
+      return { cells, hasRole: !!role };
+    });
+    const rows = rowsMeta.map(x => x.cells);
     doc.autoTable({
       startY: tableStartY,
-      head: [ group ? ["Date","Heure","Nom complet","Badge","Téléphone"] : ["Date","Heure","Nom complet","Badge","Téléphone","Groupe"] ],
+      head: [ headCols ],
       body: rows,
+      didParseCell: (data) => {
+        if(data.section === "body"){
+          const meta = rowsMeta[data.row.index];
+          if(meta && meta.hasRole){
+            data.cell.styles.fillColor = [240,240,240];
+            data.cell.styles.textColor = [0,0,0];
+          }
+        }
+      },
       styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
       headStyles: { fillColor: [200,16,46], textColor: 255 },
       theme: "striped",
       margin: { left: margin, right: margin }
     });
 
-    doc.save(`rapport_pointage_${from}_${to}.pdf`);
+    
+    // --- Groupe OFF (uniquement si Du == Au) ---
+    if(isSameDate){
+      try{
+        // compter les pointages par groupe
+        let cA = 0, cB = 0;
+        (rowsSorted || []).forEach(r => {
+          const g = rowGroup(r);
+          if(g === "A") cA++;
+          else if(g === "B") cB++;
+        });
+
+        // groupe "actif" = le plus représenté dans les pointages
+        const activeGroup = (cA >= cB) ? "A" : "B";
+        const offGroup = (activeGroup === "A") ? "B" : "A";
+
+        // récupérer tous les bénévoles (cache local / API)
+        const volsAll = await ensureVolunteers();
+
+        const normStr = (s)=> String(s ?? "").trim();
+        const getName = (v)=> normStr(v.fullName ?? v.full_name ?? v.name ?? v.nom ?? "");
+        const getBadge = (v)=> normStr(v.badgeCode ?? v.badge_code ?? "");
+        const getPhone = (v)=> normStr(v.phone ?? v.tel ?? v.telephone ?? "");
+
+        const pointedBadges = new Set((rowsSorted || []).map(r => normStr(r.badge_code ?? r.badgeCode ?? r.badge ?? "")).filter(Boolean));
+        const offVolsAll = (volsAll || []).filter(v => volGroup(v) === offGroup);
+        // On retire du groupe OFF ceux qui ont déjà pointé ce jour (ils sont déjà dans la table principale)
+        const offVols = offVolsAll.filter(v => {
+          const b = getBadge(v);
+          return !b || !pointedBadges.has(b);
+        });
+
+        if(!offVols || offVols.length === 0){
+          // Rien à afficher: tout le groupe OFF a pointé ou liste vide
+          return;
+        }
+
+        const afterY = (doc.lastAutoTable?.finalY || tableStartY) + 14;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(`Groupe OFF : ${offGroup}`, margin, afterY);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(120);
+        doc.text(`Bénévoles du groupe OFF (hors pointés). Total: ${offVols.length}`, margin, afterY + 10);
+        doc.setTextColor(0);
+
+        const offRowsMeta = offVols.map(v => {
+          const role = String(v.role || v.volunteerRole || "").trim();
+          const cells = [ getName(v), getBadge(v), role ];
+          return { cells, hasRole: !!role };
+        });
+        const offRows = offRowsMeta.map(x => x.cells);
+
+        doc.autoTable({
+          startY: afterY + 18,
+          head: [ ["Nom complet","Badge","Téléphone","Role"] ],
+          body: offRows,
+          didParseCell: (data) => {
+            if(data.section === "body"){
+              const meta = offRowsMeta[data.row.index];
+              if(meta && meta.hasRole){
+                data.cell.styles.fillColor = [240,240,240];
+                data.cell.styles.textColor = [0,0,0];
+              }
+            }
+          },
+          styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [17,24,39], textColor: 255 },
+          theme: "striped",
+          margin: { left: margin, right: margin }
+        });
+      }catch(e){
+        console.warn("OFF_GROUP_SECTION_ERROR", e);
+      }
+    }
+
+    doc.save(`rapport_pointage_${from}.pdf`);
 
   }catch(e){
     console.error(e);
@@ -622,11 +932,177 @@ async function exportPdf(){
   }
 }
 
-loadBtn.addEventListener("click", load);
-exportBtn.addEventListener("click", exportExcel);
-pdfBtn.addEventListener("click", exportPdf);
-logoutBtn.addEventListener("click", logout);
+async function exportPdfGrouped(){
+  if(!isSuperAdmin()){
+    toast("Accès réservé au Super Admin.");
+    return;
+  }
+  if(!window.jspdf?.jsPDF){
+    toast("jsPDF indisponible (réseau).");
+    return;
+  }
 
+  try{
+    setBtnLoading(pdfGroupedBtn, true, "Préparation...");
+    showLoader("Préparation du PDF (volontaires par groupes)...");
+
+    const volsAll = await ensureVolunteers();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:"portrait", unit:"pt", format:"a4" });
+
+    const margin = 36;
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const leftX = margin;
+
+    // logo
+    const logoPath = (window.POINTAGE_CONFIG && window.POINTAGE_CONFIG.PDF_LOGO_PATH) || "./assets/logo-slot.png";
+    let logoDataUrl = await loadAssetDataUrl(logoPath);
+    if(logoDataUrl && /^data:image\/webp/i.test(String(logoDataUrl))){
+      const jpeg = await toJpegDataUrl(logoDataUrl);
+      if(jpeg) logoDataUrl = jpeg;
+    }
+
+    let top = 24;
+    let logoH = 0;
+    if(logoDataUrl){
+      // Draw centered logo
+      const maxW = 180;
+      const maxH = 70;
+      try{
+        // default guess ratio 3:1
+        const w = maxW;
+        const h = Math.min(maxH, Math.round(maxW/3));
+        logoH = h;
+        doc.addImage(logoDataUrl, "PNG", (pageW - w)/2, top, w, h);
+      }catch(e){
+        // ignore
+      }
+    }
+
+    // Header (same as other PDFs)
+    const yTitle = top + logoH + 32;
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(14);
+    doc.text("Pointage Volunteers FanZone OLM 12h-18h", pageW/2, yTitle, { align:"center" });
+
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(11);
+    doc.text("Répartition des volontaires par groupe", pageW/2, yTitle + 18, { align:"center" });
+
+    const groups = ["A","B"];
+    let y = yTitle + 52;
+
+    const normStr = (v)=> String(v ?? "").trim();
+    const getId = (v)=> normStr(v.id ?? v.volunteer_id ?? v.volunteerId ?? "");
+    const getName = (v)=> normStr(v.fullName ?? v.full_name ?? v.name ?? v.nom ?? "");
+    const getBadge = (v)=> normStr(v.badgeCode ?? v.badge_code ?? "");
+    const getPhone = (v)=> normStr(v.phone ?? v.tel ?? v.telephone ?? "");
+    const getGroup = (v)=> normGroup(v.group ?? v.groupe ?? "");
+
+    for(const g of groups){
+      const volsG = (volsAll || [])
+        .filter(v => getGroup(v) === g)
+        .slice()
+        .sort((a,b)=> getName(a).localeCompare(getName(b), "fr", { sensitivity:"base" }));
+
+      const count = volsG.length;
+
+      // Page break if needed
+      if(y > pageH - 170){
+        doc.addPage();
+        y = 54;
+      }
+
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(13);
+      doc.text(`GROUPE ${g}`, leftX, y);
+      y += 16;
+
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.text(`Nombre de volontaires : ${count}`, leftX, y);
+      y += 16;
+
+      const bodyMeta = volsG.map(v => {
+        const role = String(v.role || v.volunteerRole || "").trim();
+        const cells = [ getName(v), getBadge(v), role ];
+        return { cells, hasRole: !!role };
+      });
+      const body = bodyMeta.map(x => x.cells);
+
+      doc.autoTable({
+        startY: y,
+        head: [ ["Nom complet","Badge","Role"] ],
+        body,
+        didParseCell: (data) => {
+          if(data.section === "body"){
+            const meta = bodyMeta[data.row.index];
+            if(meta && meta.hasRole){
+              data.cell.styles.fillColor = [240,240,240];
+              data.cell.styles.textColor = [0,0,0];
+            }
+          }
+        },
+        styles: { font:"helvetica", fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [200,16,46], textColor: 255 },
+        theme: "striped",
+        margin: { left: margin, right: margin }
+      });
+
+      y = (doc.lastAutoTable?.finalY || y) + 26;
+    }
+
+    doc.save("repartition_volontaires_groupes.pdf");
+
+  }catch(e){
+    console.error(e);
+    toast("Erreur lors de l’export PDF (volontaires par groupes).");
+  }finally{
+    hideLoader();
+    setBtnLoading(pdfGroupedBtn, false, "📑 PDF volontaires (groupes)");
+  }
+}
+
+
+
+
+function getRowsForRange_(from,to,group){
+  const rowsAll = Array.isArray(lastRowsRaw) ? lastRowsRaw : (rawRows || []);
+  const volsAll = Array.isArray(lastVolunteersRaw) ? lastVolunteersRaw : (rawVolunteers || []);
+  const maps = buildVolunteerMaps_(volsAll);
+  const norm = normalizeRange_(from,to);
+  const f = norm.from, t = norm.to;
+
+  let rows = (rowsAll || []).filter(r=>{
+    const d = String(r.punch_date || "");
+    return d && d >= f && d <= t;
+  });
+
+  if(group){
+    // filtrer via groupe du bénévole (source Volunteers)
+    rows = rows.filter(r=>{
+      const rid = resolveVolunteerId_(r, maps);
+      if(!rid) return false;
+      const v = maps.byId.get(rid);
+      return v && volGroup(v) === group;
+    });
+  }
+  return rows;
+}
+
+function normalizeRange_(from,to){
+  if(!from || !to) return {from,to};
+  return (from > to) ? {from:to, to:from} : {from,to};
+}
+
+
+
+if(exportBtn) exportBtn.addEventListener("click", () => exportExcel());
+if(pdfBtn) pdfBtn.addEventListener("click", () => exportPdf());
+if(pdfGroupedBtn) pdfGroupedBtn.addEventListener("click", exportPdfGrouped);
+logoutBtn.addEventListener("click", logout);
 requireSuperAdmin();
 
 async function ensureVolunteers(){
@@ -652,21 +1128,8 @@ async function ensureVolunteers(){
   return allVolunteers;
 }
 
-function getSelectedGroup(){
-  return normGroup(groupEl?.value || "");
-}
+function getSelectedGroup(){ return null; }
 
-function populateGroupSelect(_volunteers){
-  if(!groupEl) return;
-  // Static groups: A / B
-  const selected = groupEl.value;
-  groupEl.innerHTML = [
-    '<option value="">Tous les groupes</option>',
-    '<option value="A">Groupe A</option>',
-    '<option value="B">Groupe B</option>',
-  ].join("");
-  if(selected) groupEl.value = selected;
-}
 
 function filterVolunteersByGroup(volunteers, group){
   if(!group) return volunteers;
@@ -744,23 +1207,80 @@ function parseIso(ts){
   return isNaN(d.getTime()) ? null : d;
 }
 
-function computeAbsentsForDate(volunteers, rows, dateISO){
-  const present = new Set((rows||[]).filter(r => r.punch_date === dateISO).map(r => String(r.volunteer_id || "")));
+
+// --- Planning groupes (alternance) ---
+// Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
+const PLANNING_BASE_DATE = "2025-12-27";
+const PLANNING_BASE_GROUP = "B";
+
+function plannedGroupForDate(dateISO){
+  if(!dateISO) return PLANNING_BASE_GROUP;
+  const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
+  const d1 = new Date(String(dateISO) + "T00:00:00");
+  const diffDays = Math.floor((d1.getTime() - d0.getTime()) / 86400000);
+  if(diffDays % 2 === 0) return PLANNING_BASE_GROUP;
+  return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
+}
+function offGroupForDate(dateISO){
+  const g = plannedGroupForDate(dateISO);
+  return (g === "A") ? "B" : "A";
+}
+
+
+function buildVolunteerMaps_(vols){
+  const byId = new Map();
+  const idByBadge = new Map();
+  (vols || []).forEach(v => {
+    const id = String(v.id || "").trim();
+    if(id) byId.set(id, v);
+    const badge = String(v.badgeCode ?? v.badge_code ?? "").trim();
+    if(badge) idByBadge.set(badge, id);
+  });
+  return { byId, idByBadge };
+}
+function resolveVolunteerId_(row, maps){
+  const vid = String(row?.volunteer_id || "").trim();
+  if(vid && maps.byId.has(vid)) return vid;
+
+  const badge = String(row?.badge_code || row?.badgeCode || row?.badge || "").trim();
+  const mapped = badge ? (maps.idByBadge.get(badge) || "") : "";
+  if(mapped && maps.byId.has(mapped)) return mapped;
+
+  return "";
+}
+
+
+
+function computeAbsentsForDate(volunteers, rows, dateISO, group){
+  const present = new Set(
+    (rows||[])
+      .filter(r => String(r.punch_date||"") === String(dateISO||"") && (!group || rowGroup(r) === group))
+      .map(r => String(r.volunteer_id || "").trim())
+  );
   return (volunteers||[])
     .filter(v => !present.has(String(v.id)))
     .sort((a,b)=> (a.fullName||"").localeCompare(b.fullName||"", "fr"));
 }
 
-function renderAbsencesList(list){
-  if(!absencesTbodyEl) return;
-  absencesTbodyEl.innerHTML = (list||[]).map(v => `
+function renderAbsencesInto_(list, tbodyEl){
+  if(!tbodyEl) return;
+  if(!list || !list.length){
+    tbodyEl.innerHTML = `<tr><td colspan="3" class="text-center text-white-50">Aucune absence.</td></tr>`;
+    return;
+  }
+  tbodyEl.innerHTML = list.map(v => `
     <tr>
-      <td>${escapeHtml(v.fullName||"")}</td>
-      <td>${escapeHtml(v.badgeCode||"")}</td>
-      <td>${escapeHtml(v.phone||"")}</td>
+      <td>${escapeHtml(v.fullName||v.full_name||"")}</td>
+      <td>${escapeHtml(v.badgeCode||v.badge_code||"")}</td>
+      <td>${escapeHtml(formatPhoneForUi_(v.phone))}</td>
     </tr>
   `).join("");
 }
+
+function renderAbsencesList(list){
+  renderAbsencesInto_(list, absencesTbody);
+}
+
 
 function closeAbsencesModal(){
   if(!absencesModalEl) return;
@@ -770,7 +1290,9 @@ function closeAbsencesModal(){
 function openAbsencesModal(dateISO){
   if(!absencesModalEl) return;
   absencesModalEl.classList.remove("d-none");
-  if(absencesSubEl) absencesSubEl.textContent = `Date : ${dateISO}`;
+  const workG = plannedGroupForDate(dateISO);
+  const offG = offGroupForDate(dateISO);
+  if(absencesSubEl) absencesSubEl.textContent = `Date : ${dateISO} — Groupe actif : ${workG} (OFF: ${offG})`;
   setTimeout(()=> absencesSearchEl?.focus(), 120);
 }
 
@@ -866,16 +1388,36 @@ function renderChart(rows, from, to){
   let label = "";
 
   if(from === to){
-    label = "Pointages par heure";
-    const byHour = {};
+    // Pointages par heure + répartition par groupe
+    const byHourA = {};
+    const byHourB = {};
     (rows||[]).forEach(r=>{
       const d = parseIso(r.punched_at);
       if(!d) return;
       const h = d.toLocaleTimeString("fr-FR", { hour:"2-digit" });
-      byHour[h] = (byHour[h]||0)+1;
+      const g = rowGroup(r);
+      if(g === "A") byHourA[h] = (byHourA[h]||0)+1;
+      else if(g === "B") byHourB[h] = (byHourB[h]||0)+1;
     });
-    labels = Object.keys(byHour).sort((a,b)=>Number(a)-Number(b));
-    values = labels.map(h=>byHour[h]);
+    labels = Array.from(new Set([...Object.keys(byHourA), ...Object.keys(byHourB)])).sort((a,b)=>Number(a)-Number(b));
+    const valuesA = labels.map(h=>byHourA[h]||0);
+    const valuesB = labels.map(h=>byHourB[h]||0);
+    label = "Pointages par heure";
+    values = null; // unused
+
+    if(dashChart) dashChart.destroy();
+    dashChart = new Chart(dashChartCanvas.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Groupe A", data: valuesA, backgroundColor: "rgba(81,120,255,0.85)" },
+          { label: "Groupe B", data: valuesB, backgroundColor: "rgba(200,16,46,0.75)" }
+        ]
+      },
+      options: { responsive:true, plugins:{ legend:{ display:true } }, scales:{ x:{ stacked:false }, y:{ beginAtZero:true } } }
+    });
+    return;
   }else{
     label = "Pointages par jour";
     const byDay = {};
@@ -901,12 +1443,14 @@ function periodLabel(from, to){
   return `Période : du ${from} au ${to}`;
 }
 
-window.addEventListener('DOMContentLoaded', ()=>{ setDefaultDates(); load(); });
-  daysBody.addEventListener("keydown", async (e)=>{
-    if(e.key !== "Enter" && e.key !== " ") return;
-    const btn = e.target.closest(".abs-day-btn");
-    if(!btn) return;
-    e.preventDefault();
-    btn.click();
-  });
 
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  setDefaultDates();
+  if(loadBtn){
+    loadBtn.addEventListener("click", load);
+  }
+  // chargement initial (aujourd'hui)
+  load();
+});

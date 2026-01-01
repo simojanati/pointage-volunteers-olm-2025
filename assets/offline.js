@@ -22,9 +22,7 @@
         };
         req.onsuccess = ()=> resolve(req.result);
         req.onerror = ()=> reject(req.error || new Error("IDB_OPEN_ERROR"));
-      }catch(e){
-        reject(e);
-      }
+      }catch(e){ reject(e); }
     });
     return __idbPromise;
   }
@@ -109,12 +107,8 @@
     return await new Promise((resolve, reject)=>{
       const tx = db.transaction(["queue"], "readwrite");
       const st = tx.objectStore("queue");
-      let done = 0;
-      arr.forEach(id=>{
-        const req = st.delete(id);
-        req.onsuccess = ()=>{ done++; };
-      });
-      tx.oncomplete = ()=> resolve(done);
+      arr.forEach(id=> st.delete(id));
+      tx.oncomplete = ()=> resolve(arr.length);
       tx.onerror = ()=> reject(tx.error || new Error("IDB_DELETE_ERROR"));
     });
   }
@@ -131,7 +125,7 @@
       createdAt: Date.now(),
       dedupKey
     };
-    try{ await queueAdd(op); }catch(e){ /* unique constraint => already queued */ }
+    try{ await queueAdd(op); }catch(e){ /* already queued */ }
 
     // optimistic cache update for deja-pointé
     try{
