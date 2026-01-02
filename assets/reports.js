@@ -192,6 +192,7 @@ const loadBtn = document.getElementById("loadBtn");
 const exportBtn = document.getElementById("exportBtn");
 const pdfBtn = document.getElementById("pdfBtn");
 const pdfGroupedBtn = document.getElementById("pdfGroupedBtn");
+const archiveBtn = document.getElementById("archiveBtn");
 
 const totalEl = document.getElementById("totalVolunteers");
 const rateEl = document.getElementById("ratePct");
@@ -212,6 +213,13 @@ const absencesSubEl = document.getElementById('absencesSub');
 const absencesCountEl = document.getElementById('absencesCount');
 const absencesSearchEl = document.getElementById('absencesSearch');
 const absencesTbodyEl = document.getElementById('absencesTbody');
+
+// Archive modal
+const archiveModalEl = document.getElementById('archiveModal');
+const archiveCloseEl = document.getElementById('archiveClose');
+const archiveCloseEl2 = document.getElementById('archiveClose2');
+const archiveCountEl = document.getElementById('archiveCount');
+const archiveTbodyEl = document.getElementById('archiveTbody');
 
 const kpiRateEl = document.getElementById('kpiRate');
 const kpiAbsentsEl = document.getElementById('kpiAbsents');
@@ -435,6 +443,7 @@ function bindDaysAbsences(){
 async function load(){
   bindAbsencesModal();
   bindDaysAbsences();
+  bindArchiveModal();
   renderUserPill();
   showLoader("Chargement des rapports...");
   if(loadBtn) setBtnLoading(loadBtn, true, "Chargement...");
@@ -450,6 +459,12 @@ if(logsBtn){
 }
 
   if(pdfGroupedBtn && !isSuperAdmin()) pdfGroupedBtn.style.display = "none";
+
+  // Archive popup (SUPER_ADMIN)
+  if(archiveBtn){
+    if(!isSuperAdmin()) archiveBtn.style.display = "none";
+    else archiveBtn.addEventListener("click", loadArchiveAndShow);
+  }
   const chosen = (singleDateEl && singleDateEl.value) ? singleDateEl.value : ((fromEl && fromEl.value) ? fromEl.value : "");
   const from = chosen;
   const to = chosen;
@@ -1343,6 +1358,125 @@ function bindAbsencesModal(){
   document.addEventListener("keydown", (e)=>{
     if(e.key === "Escape" && !absencesModalEl.classList.contains("d-none")){
       closeAbsencesModal();
+    }
+  });
+}
+
+// --- Archive volunteers modal ---
+function closeArchiveModal(){
+  if(!archiveModalEl) return;
+  archiveModalEl.classList.add("d-none");
+}
+
+function openArchiveModal(){
+  if(!archiveModalEl) return;
+  archiveModalEl.classList.remove("d-none");
+}
+
+function renderArchiveList(list){
+  if(!archiveTbodyEl) return;
+  const rows = Array.isArray(list) ? list : [];
+  if(archiveCountEl) archiveCountEl.textContent = String(rows.length);
+
+  if(!rows.length){
+    archiveTbodyEl.innerHTML = `<tr><td colspan="6" class="text-center text-white-50">Aucun bénévole archivé.</td></tr>`;
+    return;
+  }
+
+  archiveTbodyEl.innerHTML = rows.map(v => {
+    const vid = String(v.id || "");
+    const fullName = v.fullName || v.full_name || "";
+    const badge = v.badgeCode || v.badge_code || "";
+    const group = v.group || v.groupe || "";
+    const phone = formatPhoneForUi_(v.phone);
+    const deletedAt = v.deletedAt || v.deleted_at || "";
+    return `
+      <tr data-vid="${escapeHtml(vid)}">
+        <td>${escapeHtml(fullName)}</td>
+        <td>${escapeHtml(badge)}</td>
+        <td>${escapeHtml(group)}</td>
+        <td>${escapeHtml(phone)}</td>
+        <td class="text-white-50">${escapeHtml(deletedAt)}</td>
+        <td class="text-end">
+          <button class="btn btn-success btn-sm" data-action="reactivate" data-id="${escapeHtml(vid)}">Réactiver</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function loadArchiveAndShow(){
+  try{
+    showLoader("Chargement archive...");
+    const res = await apiListArchivedVolunteers();
+    if(!res || !res.ok){
+      toast("Erreur chargement archive");
+      return;
+    }
+    renderArchiveList(res.volunteers || res.archivedVolunteers || []);
+    openArchiveModal();
+  }catch(e){
+    console.error(e);
+    toast("Erreur chargement archive");
+  }finally{
+    hideLoader();
+  }
+}
+
+function bindArchiveModal(){
+  if(!archiveModalEl) return;
+
+  archiveCloseEl?.addEventListener("click", closeArchiveModal);
+  archiveCloseEl2?.addEventListener("click", closeArchiveModal);
+  archiveModalEl.querySelector(".olm-modal-backdrop")?.addEventListener("click", closeArchiveModal);
+
+  document.addEventListener("keydown", (e)=>{
+    if(e.key === "Escape" && !archiveModalEl.classList.contains("d-none")){
+      closeArchiveModal();
+    }
+  });
+
+  // Event delegation for Reactivate
+  archiveTbodyEl?.addEventListener("click", async (e)=>{
+    const btn = e.target?.closest?.("button[data-action='reactivate']");
+    if(!btn) return;
+    const id = String(btn.getAttribute("data-id") || "").trim();
+    if(!id) return;
+
+    try{
+      btn.disabled = true;
+      btn.dataset._old = btn.innerHTML;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
+
+      const res = await apiReactivateVolunteer(id);
+      if(!res || !res.ok){
+        const err = String(res?.error || "ERROR");
+        if(err === "ALREADY_ACTIVE") toast("Déjà actif");
+        else if(err === "BADGE_ALREADY_EXISTS") toast("Badge déjà utilisé");
+        else if(err === "QR_ALREADY_EXISTS") toast("QR déjà utilisé");
+        else toast("Erreur réactivation");
+        return;
+      }
+
+      // Remove row from UI
+      const tr = btn.closest("tr");
+      tr?.remove();
+      // Update counter
+      const current = archiveTbodyEl?.querySelectorAll("tr")?.length || 0;
+      if(archiveCountEl) archiveCountEl.textContent = String(current);
+
+      // Clear volunteers cache to reflect changes elsewhere
+      try{ localStorage.removeItem("pointage_vol_cache"); }catch(e){}
+      toast("Bénévole réactivé");
+    }catch(err){
+      console.error(err);
+      toast("Erreur réactivation");
+    }finally{
+      try{
+        btn.innerHTML = btn.dataset._old || "Réactiver";
+        delete btn.dataset._old;
+      }catch(e){}
+      btn.disabled = false;
     }
   });
 }

@@ -86,6 +86,15 @@ async function apiDeleteVolunteer(id){
   return jsonpRequest({ action:"deleteVolunteer", id: String(id) });
 }
 
+// SUPER_ADMIN: Archive helpers
+async function apiListArchivedVolunteers(){
+  return jsonpRequest({ action:"listArchivedVolunteers" });
+}
+
+async function apiReactivateVolunteer(id){
+  return jsonpRequest({ action:"reactivateVolunteer", id: String(id) });
+}
+
 
 function apiAssignQrCode(volunteerId, qrCode){
   return jsonpRequest({ action:"assignQrCode", volunteerId: String(volunteerId), qrCode: String(qrCode || "") });

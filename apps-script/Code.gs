@@ -298,6 +298,20 @@ function doGet(e){
       p.__session = auth.session;
       return jsonp(deleteVolunteer(p), callback);
     }
+
+    if(action === "listArchivedVolunteers"){
+      const auth = requireRole(p, "SUPER_ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      p.__session = auth.session;
+      return jsonp(listArchivedVolunteers(p), callback);
+    }
+
+    if(action === "reactivateVolunteer"){
+      const auth = requireRole(p, "SUPER_ADMIN");
+      if(!auth.ok) return jsonp(auth, callback);
+      p.__session = auth.session;
+      return jsonp(reactivateVolunteer(p), callback);
+    }
     if(action === "runAutoPunchRoles"){
       const auth = requireRole(p, "ADMIN");
       if(!auth.ok) return jsonp(auth, callback);
@@ -825,6 +839,141 @@ function deleteVolunteer(p){
   sh.deleteRow(rowToDelete);
 
   appendLog_(sess, "DELETE_VOLUNTEER", { volunteerId: id, result:"OK", deleted: snapshot });
+  return { ok:true };
+}
+
+
+function listArchivedVolunteers(p){
+  const shA = SpreadsheetApp.getActive().getSheetByName(SHEET_VOL_ARCHIVE);
+  if(!shA) return { ok:true, volunteers: [] };
+
+  // Ensure expected headers exist (backward compatible)
+  ensureHeader(shA, "deleted_at");
+  ensureHeader(shA, "deleted_by");
+  ensureHeader(shA, "id");
+  ensureHeader(shA, "full_name");
+  ensureHeader(shA, "badge_code");
+  ensureHeader(shA, "qr_code");
+  ensureHeader(shA, "phone");
+  ensureHeader(shA, "group");
+  ensureHeader(shA, "role");
+
+  const h = headerIndex(shA);
+  if(!h.ok) return h;
+  const idx = h.idx;
+  const rows = h.values.slice(1);
+
+  const out = [];
+  rows.forEach(r => {
+    const id = (idx.id !== undefined) ? String(r[idx.id] || "").trim() : "";
+    if(!id) return;
+    out.push({
+      id,
+      fullName: (idx["full_name"] !== undefined) ? String(r[idx["full_name"]] || "").trim() : "",
+      badgeCode: (idx["badge_code"] !== undefined) ? String(r[idx["badge_code"]] || "").trim() : "",
+      qrCode: (idx["qr_code"] !== undefined) ? String(r[idx["qr_code"]] || "").trim() : "",
+      phone: (idx.phone !== undefined) ? String(r[idx.phone] || "").trim() : "",
+      group: pickGroup(idx, r),
+      role: (idx.role !== undefined) ? String(r[idx.role] || "").trim() : "",
+      deletedAt: (idx["deleted_at"] !== undefined) ? String(r[idx["deleted_at"]] || "").trim() : "",
+      deletedBy: (idx["deleted_by"] !== undefined) ? String(r[idx["deleted_by"]] || "").trim() : ""
+    });
+  });
+
+  // Optional: most recent deletions first (best effort)
+  out.reverse();
+  return { ok:true, volunteers: out };
+}
+
+
+function reactivateVolunteer(p){
+  const sess = p.__session || null;
+  const id = String(p.id || "").trim();
+  if(!id) return { ok:false, error:"MISSING_ID" };
+
+  const ss = SpreadsheetApp.getActive();
+  const shA = ss.getSheetByName(SHEET_VOL_ARCHIVE);
+  if(!shA) return { ok:false, error:"ARCHIVE_SHEET_NOT_FOUND" };
+
+  ensureHeader(shA, "id");
+  ensureHeader(shA, "full_name");
+  ensureHeader(shA, "badge_code");
+  ensureHeader(shA, "qr_code");
+  ensureHeader(shA, "phone");
+  ensureHeader(shA, "group");
+  ensureHeader(shA, "role");
+
+  const ha = headerIndex(shA);
+  if(!ha.ok) return ha;
+  const ia = ha.idx;
+
+  let rowToRestore = -1;
+  let snapshot = null;
+
+  for(let r=1; r<ha.values.length; r++){
+    const row = ha.values[r];
+    if(String(row[ia.id] || "").trim() === id){
+      rowToRestore = r + 1; // sheet row index
+      snapshot = {
+        id,
+        fullName: (ia["full_name"] !== undefined) ? String(row[ia["full_name"]] || "").trim() : "",
+        badgeCode: (ia["badge_code"] !== undefined) ? String(row[ia["badge_code"]] || "").trim() : "",
+        qrCode: (ia["qr_code"] !== undefined) ? String(row[ia["qr_code"]] || "").trim() : "",
+        phone: (ia.phone !== undefined) ? String(row[ia.phone] || "").trim() : "",
+        group: pickGroup(ia, row),
+        role: (ia.role !== undefined) ? String(row[ia.role] || "").trim() : ""
+      };
+      break;
+    }
+  }
+
+  if(rowToRestore < 0 || !snapshot) return { ok:false, error:"NOT_FOUND" };
+
+  const shV = ss.getSheetByName(SHEET_VOL);
+  if(!shV) return { ok:false, error:"VOL_SHEET_NOT_FOUND" };
+
+  ensureHeader(shV, "group");
+  ensureHeader(shV, "qr_code");
+  ensureHeader(shV, "role");
+
+  const hv = headerIndex(shV);
+  if(!hv.ok) return hv;
+  const iv = hv.idx;
+
+  // If already active, stop
+  const existsId = hv.values.slice(1).some(r => String(r[iv.id]||"").trim() === id);
+  if(existsId) return { ok:false, error:"ALREADY_ACTIVE" };
+
+  // Uniqueness checks (badge_code & qr_code)
+  const badge = String(snapshot.badgeCode || "").trim();
+  if(badge){
+    const existsBadge = hv.values.slice(1).some(r => String(r[iv["badge_code"]]||"").trim() === badge);
+    if(existsBadge) return { ok:false, error:"BADGE_ALREADY_EXISTS" };
+  }
+  const qr = String(snapshot.qrCode || "").trim();
+  if(qr && iv["qr_code"] !== undefined){
+    const existsQr = hv.values.slice(1).some(r => String(r[iv["qr_code"]]||"").trim() === qr);
+    if(existsQr) return { ok:false, error:"QR_ALREADY_EXISTS" };
+  }
+
+  // Append restored volunteer to Volunteers
+  const outRow = [];
+  hv.header.forEach(hname => {
+    if(hname === "id") outRow.push(snapshot.id);
+    else if(hname === "full_name") outRow.push(snapshot.fullName);
+    else if(hname === "badge_code") outRow.push(snapshot.badgeCode);
+    else if(hname === "qr_code") outRow.push(snapshot.qrCode);
+    else if(hname === "phone") outRow.push(snapshot.phone);
+    else if(hname === "group" || hname === "groupe") outRow.push(snapshot.group);
+    else if(hname === "role") outRow.push(snapshot.role);
+    else outRow.push("");
+  });
+  shV.appendRow(outRow);
+
+  // Remove from archive
+  shA.deleteRow(rowToRestore);
+
+  appendLog_(sess, "REACTIVATE_VOLUNTEER", { volunteerId: id, volunteerName: snapshot.fullName, badgeCode: snapshot.badgeCode, group: snapshot.group, result:"OK" });
   return { ok:true };
 }
 

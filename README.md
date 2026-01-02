@@ -1,175 +1,170 @@
-# Pointage Volunteers – OLM (2025)
+# Pointage Volunteers – OLM (Fanzone) · Guide du projet
 
-Application web (Google Apps Script + front statique) pour gérer les bénévoles et le **pointage** (présence) via liste, QR Code et opérations en masse.  
-Le projet est conçu pour un usage **mobile-first** (scanner caméra) tout en restant confortable sur desktop.
+Application web **front statique** + **Google Apps Script (Web App JSONP)** pour gérer les bénévoles et le **pointage** (présence) via liste, QR Code, et mode **offline** avec synchronisation.
+
+> **Contexte** : utilisation terrain (mobile-first) en environnement événementiel, avec besoin de fiabilité réseau et traçabilité (logs).
+
+---
+
+## Sommaire
+- [Fonctionnalités](#fonctionnalités)
+- [Rôles et permissions](#rôles-et-permissions)
+- [Mode Offline et synchronisation](#mode-offline-et-synchronisation)
+- [Archives (bénévoles supprimés)](#archives-bénévoles-supprimés)
+- [Données Google Sheets](#données-google-sheets)
+- [Déploiement](#déploiement)
+- [Scripts Google Sheets (reporting)](#scripts-google-sheets-reporting)
+- [Dépannage](#dépannage)
+- [Changelog](#changelog)
 
 ---
 
 ## Fonctionnalités
 
-### 1) Gestion des bénévoles (Admin & Super Admin)
-- **Liste des bénévoles** avec recherche rapide (nom/prénom, badge).
-- **Ajouter** un bénévole :
-  - Informations : *Nom complet, Badge code, Téléphone, Groupe, QR Code (optionnel)*.
-  - Option : **pointer immédiatement** au moment de l’ajout (radio button).
-- **Modifier** un bénévole :
-  - Mise à jour des champs (dont QR Code).
-  - Contrôles d’unicité (badge et QR Code) pour éviter les doublons.
-- Indicateur pour les bénévoles **sans QR Code** (icône + info-bulle).
+### ✅ Gestion des bénévoles
+- Liste + recherche (nom, badge).
+- Ajout / modification (contrôle d’unicité badge et QR).
+- Option “pointer immédiatement” au moment de l’ajout (si activée dans l’interface).
+- Indicateur pour les bénévoles **sans QR Code**.
 
-### 2) Pointage (présence)
+### ✅ Pointage
 - Pointage manuel depuis la liste.
-- Message clair :
-  - **Succès** (avec heure de pointage).
-  - **Déjà pointé** (avec heure du dernier pointage).
-- Support du format d’affichage de date : `DD/MM/YYYY HH:mm:ss (GMT+1)`.
+- Messages clairs :
+  - **Succès** (heure de pointage)
+  - **Déjà pointé** (heure du dernier pointage)
 
-### 3) Scan QR Code (Admin & Super Admin)
-- Page dédiée **Scan** accessible depuis Pointage.
-- Lecture via la **caméra arrière** (préférence automatique).
-- À la lecture d’un QR :
-  - Si le QR correspond à un bénévole → pointage immédiat.
-  - Si le QR est **introuvable** :
-    - Le code est copié automatiquement.
-    - Un popup permet de **chercher un bénévole** (Nom/Prénom/Badge) à partir d’un cache local.
-    - Bouton **Associer** : lie le QR scanné au bénévole sélectionné puis relance le pointage.
+### ✅ Scan QR Code + Association QR
+- Scan caméra (priorité caméra arrière si dispo).
+- Si QR inconnu :
+  - copie automatique du code
+  - popup pour rechercher un bénévole (cache local)
+  - bouton **Associer** : lie QR → bénévole, puis lance le pointage
 
-### 4) Pointage par groupe (Super Admin)
-- Bouton **Pointage par groupe** (à côté de Scan) visible uniquement pour le Super Admin.
-- Sélection du groupe (A, B) et pointage **en masse**.
+### ✅ Mode **Offline** (scan & pointage)
+- Si hors connexion, le scan :
+  - enregistre dans une **file offline (queue)** + feedback visuel & sonore
+  - refuse un doublon (même badge + même jour) avec message **Déjà pointé**
+- Au retour de connexion, bouton **Synchroniser** :
+  - envoie la file offline au backend
+  - supprime uniquement les éléments validés
+- Contrôle de doublon **même en ligne** : si le badge est déjà dans la file offline (non synchronisée), le scan est refusé et affiche **Déjà pointé**.
 
-> Note : Le projet est configuré pour 2 groupes (A, B). Le groupe C a été retiré.
+### ✅ Rapports & Export PDF (Super Admin)
+- Export PDF “Pointage” (colonnes adaptées, responsive).
+- Export PDF “Volontaires par groupes”.
 
-### 5) Rapports & PDF (Super Admin)
-- **PDF Pointage** :
-  - Export propre, responsive.
-  - Colonnes ajustées :
-    - Si *Du = Au* : la colonne Date est retirée.
-    - Téléphone affiché au format `+212...`.
-- **PDF Volontaires par groupes** :
-  - Tables séparées par groupe (A et B).
-  - Colonnes exportées : **Nom complet + Badge** (ID et Téléphone retirés).
+### ✅ Journal d’audit (Logs)
+- Enregistrement des actions : `PUNCH`, `DELETE_PUNCH`, `PUNCH_GROUP`, `ASSIGN_QR`, `ADD_VOLUNTEER`, `UPDATE_VOLUNTEER`, etc.
+- Anti-doublon en cas de retry réseau (signature + fenêtre courte).
 
-### 6) Journal d’audit (Logs) – Page dédiée (Super Admin)
-- Une feuille **Logs** (audit) enregistre les actions :
-  - `PUNCH`, `DELETE_PUNCH`, `PUNCH_GROUP`, `ASSIGN_QR`, `ADD_VOLUNTEER`, `UPDATE_VOLUNTEER`.
-- Page **Logs** dédiée :
-  - Liste du plus récent au plus ancien (dernier log en haut).
-  - Filtres : utilisateur, action, résultat.
-  - Détails pro (ex : UPDATE_VOLUNTEER affiche les champs modifiés **old → new**).
-- Anti-duplication :
-  - Protection contre les doublons de logs en cas de retry réseau (signature + fenêtre de 5 secondes).
-
-### 7) Viewer public (sans téléphone)
-- La page Viewer est pensée pour un accès public : les **numéros de téléphone ne sont pas affichés**.
+### ✅ Viewer public (sans téléphone)
+- Page Viewer : **numéros de téléphone masqués**.
 
 ---
 
-## Rôles & Permissions
-
+## Rôles et permissions
 - **Admin**
-  - Gestion des bénévoles.
-  - Scan QR + association QR.
-  - Pointage standard.
+  - Gestion des bénévoles
+  - Scan QR + association
+  - Pointage standard
 - **Super Admin**
-  - Tout ce que fait Admin.
-  - Pointage en masse par groupe.
-  - Rapports PDF.
-  - Accès à la page Logs (audit).
+  - Tout ce que fait Admin
+  - Pointage de groupe (masse)
+  - Rapports PDF
+  - Logs (audit)
+  - Accès archive (réactivation)
 
 ---
 
-## Structure du projet
+## Mode Offline et synchronisation
 
-- `admin.html` : page principale (liste bénévoles + ajout/modif).
-- `scan.html` : scanner QR + popup d’association QR.
-- `reports.html` : exports PDF + bouton Logs (Super Admin).
-- `logs.html` : page Logs (Super Admin).
-- `viewer.html` : page public (sans téléphone).
-- `assets/` : JS/CSS communs
-  - `app.js` : auth/session, navbar, helpers
-  - `admin.js` : logique admin
-  - `scan.js` : scanner + assign QR
-  - `reports.js` : exports PDF
-  - `logs.js` : affichage des logs
-  - `styles.css` : thème + responsive
-- `apps-script/Code.gs` : backend Google Apps Script (API JSONP)
+### Comportement
+- **Offline** :
+  - “Enregistré hors-ligne” + icône succès
+  - doublon → “Déjà pointé” + icône ⚠️ + son d’erreur
+- **Online** :
+  - envoie API direct
+  - doublon détecté localement (cache/queue) → “Déjà pointé”
+
+### Stockage local (front)
+- **Cache** : empêche les doublons (clé = badge + date).
+- **Queue offline** : liste des scans à synchroniser.
 
 ---
 
-## Pré-requis
+## Archives (bénévoles supprimés)
 
-- Un Google Sheet avec les feuilles :
-  - `Volunteers` (bénévoles)
-  - `Punches` (pointages)
-  - `Logs` (créée automatiquement si absente)
-- Google Apps Script déployé en **Web App**.
-- Front hébergé (GitHub Pages, Cloudflare Pages, Netlify…) en HTTPS pour l’accès caméra.
-
----
-
-## Colonnes attendues (Google Sheets)
-
-### Volunteers
-Colonnes typiques (les noms sont gérés par le script via header) :
-- `id`
-- `full_name`
-- `badge_code`
-- `phone`
-- `group`
-- `qr_code`
-
-### Punches
-- `timestamp` / `date` (selon version)
-- `volunteer_id`
-- `full_name`
-- `badge_code`
-- `group`
-
-### Logs
-Créée automatiquement par le script, avec notamment :
-- `ts`
-- `actor_username`
-- `actor_role`
-- `action`
-- `volunteer_id`
-- `volunteer_name`
-- `badge_code`
-- `group`
-- `result`
-- `details`
+Dans **Rapports**, bouton **🗃️ Archive** :
+- Affiche un popup listant tous les bénévoles présents dans la feuille `ArchiveVolunteers`.
+- Bouton **Réactiver** par ligne :
+  - remet le bénévole dans `Volunteers`
+  - supprime l’entrée correspondante dans `ArchiveVolunteers`
 
 ---
 
-## Installation & Déploiement (résumé)
+## Données Google Sheets
 
-1) **Apps Script**
-- Ouvrir `apps-script/Code.gs`
-- Coller le contenu dans votre projet Apps Script.
-- Déployer : `Deploy` → `Manage deployments` → `Edit` → `New version` → `Deploy`
-- Récupérer l’URL de la Web App.
+### Feuilles principales
+- `Volunteers`
+  - `id`, `full_name`, `badge_code`, `phone`, `group`, `qr_code`, …
+- `Punches`
+  - `volunteer_id`, `punched_at` (ou `punch_date`), `badge_code`, `full_name`, …
+- `Logs`
+  - `ts`, `actor_username`, `actor_role`, `action`, `result`, `details`, …
+- `Users`
+  - `username`, `pin`, `role`, **`nomComplet`** (nouveau : affichage UI)
+- `ArchiveVolunteers`
+  - mêmes champs utiles que `Volunteers` (bénévoles archivés)
 
-2) **Front**
-- Mettre à jour `assets/config.js` avec l’URL de la Web App.
-- Héberger le front en **HTTPS** (obligatoire pour la caméra).
-
-3) **Autorisation caméra**
-- Sur mobile : autoriser l’accès caméra (Chrome/Android ou Safari/iOS).
-- Le scan privilégie la caméra arrière quand disponible.
-
----
-
-## Bonnes pratiques
-- Utiliser HTTPS (sinon les APIs caméra sont souvent bloquées).
-- Garder un badge unique + QR Code unique.
-- En cas de modification côté Apps Script, toujours redéployer une **New version**.
+> Les scripts utilisent les **headers** pour retrouver les colonnes : évitez de renommer les en-têtes sans mise à jour correspondante.
 
 ---
 
-## Changelog (principales évolutions)
-- Ajout Scan QR + association QR en cas de QR introuvable.
-- Ajout pointage en masse par groupe (Super Admin).
-- Ajout rapports PDF (pointage + bénévoles par groupe).
-- Ajout page Logs + audit complet + anti-doublons.
-- Suppression du groupe C (A et B uniquement).
-- Masquage téléphone sur Viewer public.
+## Déploiement
+
+### 1) Backend Apps Script (Web App)
+1. Coller le contenu du backend dans Apps Script
+2. Déployer en Web App :
+   - **Execute as**: Me
+   - **Who has access**: Anyone / Anyone with Google account
+3. Récupérer l’URL `/exec`
+
+### 2) Front (statique)
+- Mettre à jour `assets/config.js` avec l’URL Web App.
+- Héberger en **HTTPS** (obligatoire pour caméra).
+
+---
+
+## Scripts Google Sheets (reporting)
+
+### A) Absences depuis une date (historique)
+- Génère une feuille `absences_long` et **append** les résultats (report_at + start_date + volunteer).
+
+### B) Statistiques de pointage par bénévole
+- Crée `volunteers_pointage_count` :
+  - `full_name`, `badge_code`, `group`
+  - `pointage_count` (nombre de pointages)
+  - `last_pointage_at` (dernière date)
+
+---
+
+## Dépannage
+
+### Erreur “JSONP error / Impossible de contacter l’API”
+Causes fréquentes :
+- Web App non publique (access restreint)
+- Mauvaise URL `/exec`
+- **Erreur Apps Script au chargement** (ex : variables globales dupliquées)
+
+✅ À vérifier :
+- Une seule déclaration globale pour `TOKEN` / `doGet`
+- Déployer une **New version** après changement
+
+---
+
+## Changelog (résumé)
+- Mode Offline (queue + sync) + anti-doublon local
+- Icônes & feedback unifiés (succès / ⚠️ déjà pointé)
+- Ajout `Users.nomComplet` (affichage UI)
+- Bouton Archive + popup + réactivation depuis `ArchiveVolunteers`
+- Scripts Google Sheets : absences + stats pointage

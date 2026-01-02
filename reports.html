@@ -45,7 +45,13 @@
             <h1 class="h5 mb-1 text-white">Rapports : 15h - 19h</h1>
             <div class="text-muted2 small">Filtre par date + Export Excel</div>
           </div>
-          <div class="d-flex gap-2 flex-wrap justify-content-end"><button id="pdfBtn" class="btn btn-outline-light btn-sm">🧾 Export PDF</button><button id="pdfGroupedBtn" class="btn btn-outline-light btn-sm">📑 PDF volontaires (groupes)</button><button id="logsBtn" class="btn btn-outline-light btn-sm">🧾 Logs</button><button id="exportBtn" class="btn btn-success btn-sm">⬇ Export Excel</button></div>
+          <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <button id="pdfBtn" class="btn btn-outline-light btn-sm">🧾 Export PDF</button>
+            <button id="archiveBtn" class="btn btn-outline-light btn-sm">🗃️ Archive</button>
+            <button id="pdfGroupedBtn" class="btn btn-outline-light btn-sm">📑 PDF volontaires (groupes)</button>
+            <button id="logsBtn" class="btn btn-outline-light btn-sm">🧾 Logs</button>
+            <button id="exportBtn" class="btn btn-success btn-sm">⬇ Export Excel</button>
+          </div>
         </div>
 
         <div class="row g-2 mt-2 align-items-end">
@@ -221,6 +227,47 @@
 
       <div class="olm-modal-footer">
         <button class="btn btn-outline-light" type="button" id="absencesClose2">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Archive Volunteers (custom modal) -->
+  <div id="archiveModal" class="olm-modal d-none" role="dialog" aria-modal="true" aria-labelledby="archiveTitle">
+    <div class="olm-modal-backdrop"></div>
+    <div class="olm-modal-card">
+      <div class="olm-modal-header">
+        <div>
+          <div id="archiveTitle" class="olm-modal-title">Archive des bénévoles</div>
+          <div class="olm-modal-sub" id="archiveSub">Liste complète (sans filtre)</div>
+        </div>
+        <button class="btn btn-sm btn-outline-light" type="button" id="archiveClose">✕</button>
+      </div>
+
+      <div class="olm-modal-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <div class="small text-muted2">Total: <span id="archiveCount">0</span></div>
+          <div class="small text-white-50" id="archiveHint">Cliquez sur “Réactiver” pour restaurer un bénévole.</div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-dark table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Nom complet</th>
+                <th>Badge</th>
+                <th>Groupe</th>
+                <th>Téléphone</th>
+                <th>Supprimé le</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="archiveTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="olm-modal-footer">
+        <button class="btn btn-outline-light" type="button" id="archiveClose2">Fermer</button>
       </div>
     </div>
   </div>
