@@ -57,18 +57,8 @@ async function apiReportSummary(fromISO, toISO) {
   return jsonpRequest({ action:"reportSummary", from: fromISO, to: toISO });
 }
 
-// Optimized bundle for Reports initial load: summary + lite rows in a single call
-async function apiReportBundleLite(fromISO, toISO) {
-  return jsonpRequest({ action:"reportBundleLite", from: fromISO, to: toISO });
-}
-
 async function apiReportPunches(fromISO, toISO) {
   return jsonpRequest({ action:"reportPunches", from: fromISO, to: toISO });
-}
-
-// Lite payload for Reports initial load (faster): only fields needed for KPIs/absences/chart
-async function apiReportPunchesLite(fromISO, toISO) {
-  return jsonpRequest({ action:"reportPunchesLite", from: fromISO, to: toISO });
 }
 
 // Local YYYY-MM-DD (avoid UTC shift from toISOString)
