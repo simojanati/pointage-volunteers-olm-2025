@@ -194,6 +194,102 @@ const pdfBtn = document.getElementById("pdfBtn");
 const pdfGroupedBtn = document.getElementById("pdfGroupedBtn");
 const archiveBtn = document.getElementById("archiveBtn");
 
+// --- Lazy-load export libraries (ExcelJS + jsPDF) to speed up first load ---
+const __libLoad = {};
+function __loadScriptOnce(url, testFn){
+  try{ if(typeof testFn === 'function' && testFn()) return Promise.resolve(true); }catch(e){}
+  if(__libLoad[url]) return __libLoad[url];
+  __libLoad[url] = new Promise((resolve)=>{
+    const s = document.createElement('script');
+    s.src = url;
+    s.async = true;
+    s.onload = ()=> resolve(true);
+    s.onerror = ()=> resolve(false);
+    document.head.appendChild(s);
+  });
+  return __libLoad[url];
+}
+
+async function ensureExcelJs_(){
+  const ok = await __loadScriptOnce(
+    'https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js',
+    ()=> !!window.ExcelJS
+  );
+  return ok && !!window.ExcelJS;
+}
+
+async function ensurePdfLibs_(){
+  const ok1 = await __loadScriptOnce(
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    ()=> !!(window.jspdf && window.jspdf.jsPDF)
+  );
+  if(!ok1 || !(window.jspdf && window.jspdf.jsPDF)) return false;
+  // Compatibility alias for jspdf-autotable plugin bundles
+  if(!window.jsPDF) window.jsPDF = window.jspdf.jsPDF;
+
+  // Detect whether AutoTable is actually available (some CDNs may return HTML/error pages)
+  const hasAutoTable_ = ()=>{
+    try{
+      const g = window;
+      const jsPDF = (g.jspdf && g.jspdf.jsPDF) ? g.jspdf.jsPDF : g.jsPDF;
+      if(jsPDF && jsPDF.API && typeof jsPDF.API.autoTable === 'function') return true;
+      if(typeof g.autoTable === 'function') return true;
+      if(typeof g.jspdfAutoTable === 'function') return true;
+      return false;
+    }catch(e){
+      return false;
+    }
+  };
+
+  // autoTable plugin (adds doc.autoTable). Try multiple CDNs for robustness.
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js',
+    'https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+    // Older, widely mirrored version as a fallback
+    'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js'
+  ];
+
+  for(const url of urls){
+    const ok = await __loadScriptOnce(url, hasAutoTable_);
+    if(ok && hasAutoTable_()) return true;
+  }
+  return false;
+}
+// Robust wrapper for jsPDF-AutoTable across different bundles (UMD / plugin)
+function autoTableSafe_(doc, options){
+  if(doc && typeof doc.autoTable === "function"){
+    return doc.autoTable(options);
+  }
+  const g = (typeof window !== "undefined") ? window : {};
+  const candidates = [
+    g.autoTable,
+    g.jspdfAutoTable,
+    g.jspdfAutotable,
+    g.jspdf_autotable
+  ];
+  for(const c of candidates){
+    if(typeof c === "function"){
+      return c(doc, options);
+    }
+    if(c && typeof c.autoTable === "function"){
+      return c.autoTable(doc, options);
+    }
+    if(c && typeof c.default === "function"){
+      return c.default(doc, options);
+    }
+  }
+  try{
+    const { jsPDF } = g.jspdf || {};
+    if(jsPDF && jsPDF.API && typeof jsPDF.API.autoTable === "function"){
+      return jsPDF.API.autoTable.call(doc, options);
+    }
+  }catch(e){}
+  throw new Error("AutoTable introuvable (jspdf-autotable non chargé).");
+}
+
+
 const totalEl = document.getElementById("totalVolunteers");
 const rateEl = document.getElementById("ratePct");
 const totalGroupAEl = document.getElementById("totalGroupA");
@@ -621,8 +717,9 @@ async function exportExcel(opts=null){
   const group = getSelectedGroup();
   const from = opts?.from || fromEl.value;
   const to = opts?.to || toEl.value;
-if(!window.ExcelJS){
-    toast("ExcelJS indisponible (réseau).");
+  // Lazy-load ExcelJS only when exporting
+  if(!(await ensureExcelJs_())){
+    toast("Impossible de charger ExcelJS (réseau).");
     return;
   }
   let rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
@@ -762,8 +859,9 @@ async function exportPdf(opts=null){
   const group = getSelectedGroup();
   const from = opts?.from || fromEl.value;
   const to = opts?.to || toEl.value;
-if(!window.jspdf?.jsPDF){
-    toast("jsPDF indisponible (réseau).");
+  // Lazy-load jsPDF only when exporting
+  if(!(await ensurePdfLibs_())){
+    toast("Impossible de charger jsPDF/AutoTable (réseau).");
     return;
   }
   let rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
@@ -987,7 +1085,7 @@ if(!window.jspdf?.jsPDF){
       return { cells, hasRole: !!role };
     });
     const rows = rowsMeta.map(x => x.cells);
-    doc.autoTable({
+    autoTableSafe_(doc, {
       startY: tableStartY,
       head: [ headCols ],
       body: rows,
@@ -1061,7 +1159,7 @@ if(!window.jspdf?.jsPDF){
         });
         const offRows = offRowsMeta.map(x => x.cells);
 
-        doc.autoTable({
+        autoTableSafe_(doc, {
           startY: afterY + 18,
           head: [ ["Nom complet","Badge","Téléphone","Role"] ],
           body: offRows,
@@ -1100,8 +1198,9 @@ async function exportPdfGrouped(){
     toast("Accès réservé au Super Admin.");
     return;
   }
-  if(!window.jspdf?.jsPDF){
-    toast("jsPDF indisponible (réseau).");
+  // Lazy-load jsPDF only when exporting
+  if(!(await ensurePdfLibs_())){
+    toast("Impossible de charger jsPDF/AutoTable (réseau).");
     return;
   }
 
@@ -1195,7 +1294,7 @@ async function exportPdfGrouped(){
       });
       const body = bodyMeta.map(x => x.cells);
 
-      doc.autoTable({
+      autoTableSafe_(doc, {
         startY: y,
         head: [ ["Nom complet","Badge","Role"] ],
         body,
