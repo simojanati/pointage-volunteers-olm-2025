@@ -243,6 +243,29 @@ let rawVolunteers = [];
 let filteredRows = [];
 let filteredVolunteers = [];
 
+// Fast lookup: volunteer_id -> full name (used for KPI first/last when rows are "lite")
+let __volNameById = new Map();
+function __rebuildVolNameMap(vols){
+  __volNameById = new Map();
+  (vols||[]).forEach(v=>{
+    const id = String(v.id || v.volunteer_id || "").trim();
+    if(!id) return;
+    const nm = (v.full_name || v.fullName || v.nomComplet || v.username || "");
+    const s = String(nm||"").trim();
+    if(s) __volNameById.set(id, s);
+  });
+}
+function __safeName(nm){
+  const s = String(nm||"").trim();
+  if(!s || s === "__") return "";
+  return s;
+}
+function __nameFromRow(r){
+  const id = String(r?.volunteer_id || r?.volunteerId || "").trim();
+  const byId = id ? __volNameById.get(id) : "";
+  return __safeName(byId) || __safeName(r?.full_name) || "—";
+}
+
 
 const toastEl = document.getElementById("toast");
 let dashChart = null;
@@ -458,6 +481,28 @@ if(logsBtn){
   }
 }
 
+// --- Reports optimization: fetch full punches only when needed (export/pdf) ---
+const __fullReportCache = Object.create(null); // key -> rows
+
+function __needsFullPunchRows(rows){
+  if(!rows || !rows.length) return false;
+  const r = rows[0] || {};
+  // Lite rows contain only punch_date/volunteer_id/punched_at/group
+  return !('full_name' in r) || !('badge_code' in r) || !('phone' in r);
+}
+
+async function ensureFullReportRows_(from, to, group){
+  const key = `${String(from||"")}||${String(to||"")}||${String(group||"")}`;
+  if(__fullReportCache[key]) return __fullReportCache[key];
+  const pr = await apiReportPunches(from, to, group || "");
+  if(!pr.ok){
+    if(pr.error === "NOT_AUTHENTICATED") { logout(); return null; }
+    throw new Error(pr.error || "PUNCHES_ERROR");
+  }
+  __fullReportCache[key] = pr.rows || [];
+  return __fullReportCache[key];
+}
+
   if(pdfGroupedBtn && !isSuperAdmin()) pdfGroupedBtn.style.display = "none";
 
   // Archive popup (SUPER_ADMIN)
@@ -475,24 +520,44 @@ if(logsBtn){
 showLoader("Chargement du rapport...");
 
   try{
-    const res = await apiReportSummary(from, to, "");
-    if(!res.ok){
-      if(res.error === "NOT_AUTHENTICATED") { logout(); return; }
-      throw new Error(res.error || "SUMMARY_ERROR");
+    // Fast path: single call (summary + lite rows)
+    let summaryRes = null;
+    let punchesRes = null;
+    if(typeof apiReportBundleLite === "function"){
+      const bundle = await apiReportBundleLite(from, to);
+      if(!bundle.ok){
+        if(bundle.error === "NOT_AUTHENTICATED") { logout(); return; }
+        throw new Error(bundle.error || "BUNDLE_ERROR");
+      }
+      summaryRes = bundle.summary || { ok:true };
+      punchesRes = { ok:true, rows: bundle.rows || [] };
+    }else{
+      // Fallback: 2 calls (older API)
+      const res = await apiReportSummary(from, to);
+      if(!res.ok){
+        if(res.error === "NOT_AUTHENTICATED") { logout(); return; }
+        throw new Error(res.error || "SUMMARY_ERROR");
+      }
+      summaryRes = res;
+
+      const pr = (typeof apiReportPunchesLite === "function")
+        ? await apiReportPunchesLite(from, to)
+        : await apiReportPunches(from, to);
+      if(!pr.ok){
+        if(pr.error === "NOT_AUTHENTICATED") { logout(); return; }
+        throw new Error(pr.error || "PUNCHES_ERROR");
+      }
+      punchesRes = pr;
     }
 
-    const pr = await apiReportPunches(from, to, "");
-    if(!pr.ok){
-      if(pr.error === "NOT_AUTHENTICATED") { logout(); return; }
-      throw new Error(pr.error || "PUNCHES_ERROR");
-    }
     // Keep raw (date-filtered) data then apply group filter consistently everywhere
-    rawRows = pr.rows || [];
+    rawRows = punchesRes.rows || [];
     lastRowsRaw = (rawRows || []).slice();
 
     try{
       const volsAll = await ensureVolunteers();
       rawVolunteers = volsAll || [];
+      __rebuildVolNameMap(rawVolunteers);
       lastVolunteersRaw = (rawVolunteers || []).slice();
       populateGroupSelect(rawVolunteers);
     }catch(_e){
@@ -503,7 +568,7 @@ showLoader("Chargement du rapport...");
 
     // Recompute summary totals based on the selected group
     const derivedSummary = {
-      ...res,
+      ...summaryRes,
       totalVolunteers: filteredVolunteers.length,
       uniqueVolunteers: new Set((filteredRows||[]).map(r=>String(r.volunteer_id||""))).size
     };
@@ -523,6 +588,32 @@ showLoader("Chargement du rapport...");
   }
 }
 
+// --- Reports: fetch full punches only when needed (Export/PDF) -----------------
+// Key: from|to|group => full rows (with name/badge/phone)
+const __fullReportRowsCache = {};
+
+async function ensureFullReportRows_(from, to, group){
+  const key = `${String(from||"")}|${String(to||"")}|${String(group||"")}`;
+  if(__fullReportRowsCache[key]) return __fullReportRowsCache[key];
+
+  if(typeof apiReportPunches !== "function") return [];
+  const pr = await apiReportPunches(from, to, group || "");
+  if(!pr.ok){
+    if(pr.error === "NOT_AUTHENTICATED") { logout(); return []; }
+    throw new Error(pr.error || "PUNCHES_ERROR");
+  }
+  __fullReportRowsCache[key] = pr.rows || [];
+  return __fullReportRowsCache[key];
+}
+
+function rowsAreLite_(rows){
+  const r = Array.isArray(rows) && rows.length ? rows[0] : null;
+  if(!r) return false;
+  // Lite rows miss these fields
+  return (r.full_name === undefined && r.badge_code === undefined && r.phone === undefined);
+}
+// -----------------------------------------------------------------------------
+
 async function exportExcel(opts=null){
   const chosen = (singleDateEl && singleDateEl.value) ? singleDateEl.value : ((fromEl && fromEl.value) ? fromEl.value : "");
   if(chosen){ if(fromEl) fromEl.value = chosen; if(toEl) toEl.value = chosen; }
@@ -534,10 +625,20 @@ if(!window.ExcelJS){
     toast("ExcelJS indisponible (réseau).");
     return;
   }
-  const rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
+  let rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
   if(!rowsToExport || !rowsToExport.length){
     toast("Aucune donnée à exporter.");
     return;
+  }
+
+  // If we loaded lite rows (faster reports), fetch full rows on demand for export
+  if(rowsAreLite_(rowsToExport)){
+    showLoader("Chargement des données complètes...");
+    rowsToExport = await ensureFullReportRows_(from, to, group);
+    if(!rowsToExport || !rowsToExport.length){
+      toast("Aucune donnée à exporter.");
+      return;
+    }
   }
 
   const rowsSorted = rowsToExport.slice().sort((a,b)=>{
@@ -665,10 +766,20 @@ if(!window.jspdf?.jsPDF){
     toast("jsPDF indisponible (réseau).");
     return;
   }
-  const rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
+  let rowsToExport = (opts && opts.from) ? getRowsForRange_(from,to,group) : (lastRows||[]);
   if(!rowsToExport || !rowsToExport.length){
     toast("Aucune donnée à exporter.");
     return;
+  }
+
+  // If we loaded lite rows (faster reports), fetch full rows on demand for PDF
+  if(rowsAreLite_(rowsToExport)){
+    showLoader("Chargement des données complètes...");
+    rowsToExport = await ensureFullReportRows_(from, to, group);
+    if(!rowsToExport || !rowsToExport.length){
+      toast("Aucune donnée à exporter.");
+      return;
+    }
   }
 
   const rowsSorted = rowsToExport.slice().sort((a,b)=>{
@@ -1533,7 +1644,7 @@ let first = null, last = null;
   });
 
   if(first){
-    if(kpiFirstEl) kpiFirstEl.textContent = first.r.full_name || "—";
+    if(kpiFirstEl) kpiFirstEl.textContent = __nameFromRow(first.r);
     if(kpiFirstTimeEl) kpiFirstTimeEl.textContent = `${first.r.punch_date || ""} • ${formatHM(first.r.punched_at)}`;
   }else{
     if(kpiFirstEl) kpiFirstEl.textContent = "—";
@@ -1541,7 +1652,7 @@ let first = null, last = null;
   }
 
   if(last){
-    if(kpiLastEl) kpiLastEl.textContent = last.r.full_name || "—";
+    if(kpiLastEl) kpiLastEl.textContent = __nameFromRow(last.r);
     if(kpiLastTimeEl) kpiLastTimeEl.textContent = `${last.r.punch_date || ""} • ${formatHM(last.r.punched_at)}`;
   }else{
     if(kpiLastEl) kpiLastEl.textContent = "—";
