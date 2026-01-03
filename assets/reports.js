@@ -70,6 +70,12 @@ function normGroup(g){
   return String(g ?? "").trim().toUpperCase();
 }
 
+function pad2(n){
+  n = Number(n || 0);
+  return (n < 10 ? '0' : '') + String(n);
+}
+
+
 function rowGroup(r){
   return normGroup(r?.group || r?.groupe || "");
 }
@@ -480,10 +486,10 @@ function renderSummary(data){
   // Présence: afficher ratio "présents/total" du groupe actif
   const kpiRateEl = document.getElementById("kpiRate");
   const presenceTotal = presentCountA + presentCountB;
-  if(kpiRateEl) kpiRateEl.textContent = `${presenceTotal}/${workTotal}`;
+  if(kpiRateEl) kpiRateEl.textContent = `${pad2(presenceTotal)}/${pad2(workTotal)}`;
 
-  if(presenceGroupAEl) presenceGroupAEl.textContent = `${presentCountA}/${totalA}`;
-  if(presenceGroupBEl) presenceGroupBEl.textContent = `${presentCountB}/${totalB}`;
+  if(presenceGroupAEl) presenceGroupAEl.textContent = `${pad2(presentCountA)}/${pad2(totalA)}`;
+  if(presenceGroupBEl) presenceGroupBEl.textContent = `${pad2(presentCountB)}/${pad2(totalB)}`;
 
   // Absences list (affichée directement)
   const volsWork = (volsAll||[]).filter(v => volGroup(v)===workG && String(v.id||"").trim());

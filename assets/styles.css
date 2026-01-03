@@ -325,3 +325,421 @@ code{
 @keyframes btnspin{
   to{ transform:rotate(360deg); }
 }
+
+/* Theme toggle: keep switch visible on both themes (especially on mobile) */
+.theme-toggle .form-check-input{
+  background-color: #0b1220 !important; /* always dark track */
+  border-color: rgba(255,255,255,.35) !important;
+}
+.theme-toggle .form-check-input:checked{
+  background-color: #0b1220 !important;
+}
+html[data-theme="night"] .theme-toggle .form-check-input,
+body[data-theme="night"] .theme-toggle .form-check-input{
+  border-color: rgba(0,0,0,.35) !important;
+}
+/* ------------------------------
+   Day / Night theme switch
+   Day   = current dark theme (default)
+   Night = light theme for readability
+------------------------------ */
+/* Hint native controls (mobile selects, inputs) */
+html[data-theme="day"]{ color-scheme: dark; }
+html[data-theme="night"]{ color-scheme: light; }
+
+.theme-toggle .form-check-input{
+  cursor: pointer;
+  width: 2.6rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.25);
+  background-color: rgba(255,255,255,.10);
+}
+.theme-toggle .form-check-input:focus{ box-shadow: 0 0 0 .2rem rgba(200,16,46,.25); }
+.theme-toggle .theme-emoji{ font-size: 14px; opacity: .9; }
+
+/* In NIGHT (light), keep the switch visible (avoid white-on-white) */
+html[data-theme="night"] .theme-toggle .form-check-input{
+  border-color: rgba(11,18,32,.45) !important;
+  background-color: rgba(11,18,32,.08) !important;
+}
+
+html[data-theme="night"] body{
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(200,16,46,.10), transparent 60%),
+    radial-gradient(900px 550px at 95% 0%, rgba(0,163,90,.10), transparent 55%),
+    linear-gradient(180deg, #f7f8fb, #eef1f7);
+}
+
+/* Safety: some mobile browsers may apply theme attribute on <body> */
+body[data-theme="night"]{
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(200,16,46,.10), transparent 60%),
+    radial-gradient(900px 550px at 95% 0%, rgba(0,163,90,.10), transparent 55%),
+    linear-gradient(180deg, #f7f8fb, #eef1f7);
+}
+
+html[data-theme="night"] .bg-glass{
+  background: rgba(255,255,255,.80) !important;
+  border: 1px solid rgba(0,0,0,.10) !important;
+  backdrop-filter: blur(10px);
+}
+
+html[data-theme="night"] .list-card{
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(0,0,0,.10);
+}
+
+html[data-theme="night"] .badge-soft{
+  background: rgba(0,0,0,.04) !important;
+  border: 1px solid rgba(0,0,0,.10);
+  color: #0b1220 !important;
+}
+
+html[data-theme="night"] .text-muted2{ color: rgba(0,0,0,.62) !important; }
+
+/* Override forced white titles in night mode */
+html[data-theme="night"] h1,
+html[data-theme="night"] h2,
+html[data-theme="night"] h3,
+html[data-theme="night"] h4,
+html[data-theme="night"] h5,
+html[data-theme="night"] h6,
+html[data-theme="night"] .navbar-brand,
+html[data-theme="night"] .nav-link,
+html[data-theme="night"] .list-card .fw-bold{
+  color:#0b1220 !important;
+}
+
+html[data-theme="night"] .navbar{ border-bottom: 1px solid rgba(0,0,0,.10); }
+
+html[data-theme="night"] .user-pill{
+  background: rgba(0,0,0,.04);
+  border: 1px solid rgba(0,0,0,.12);
+  color:#0b1220;
+}
+
+html[data-theme="night"] .badge-role-admin{
+  background: rgba(0,0,0,.04);
+  color:#0b1220;
+  border: 1px solid rgba(0,0,0,.12);
+}
+
+html[data-theme="night"] .btn-outline-light{
+  color:#0b1220;
+  border-color: rgba(0,0,0,.18);
+}
+html[data-theme="night"] .btn-outline-light:hover{
+  background: rgba(0,0,0,.05);
+  border-color: rgba(0,0,0,.18);
+}
+
+html[data-theme="night"] .form-control.bg-dark,
+html[data-theme="night"] .form-select.bg-dark{
+  background: rgba(255,255,255,.92) !important;
+  color:#0b1220 !important;
+  border: 1px solid rgba(0,0,0,.10) !important;
+}
+
+html[data-theme="night"] code{
+  background: rgba(0,0,0,.04);
+  border: 1px solid rgba(0,0,0,.10);
+  color: #0b1220;
+}
+
+html[data-theme="night"] .page-loader{ background: rgba(0,0,0,.35); }
+html[data-theme="night"] .page-loader .loader-card{
+  background: rgba(255,255,255,.85);
+  border: 1px solid rgba(0,0,0,.10);
+}
+
+/* Bootstrap close button: in night mode we want the default dark icon */
+html[data-theme="night"] .btn-close-white{ filter: none !important; }
+
+/* Custom modal card in night mode */
+html[data-theme="night"] .olm-modal-card{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(255,255,255,.96);
+}
+html[data-theme="night"] .olm-modal-header,
+html[data-theme="night"] .olm-modal-footer{
+  border-color: rgba(0,0,0,.08);
+}
+html[data-theme="night"] .olm-modal-title{ color:#0b1220; }
+html[data-theme="night"] .olm-modal-sub{ color: rgba(0,0,0,.60); }
+
+
+
+/* ===== Theme toggle placement (between brand and actions) ===== */
+.nav-container{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  flex-wrap:wrap;
+}
+.nav-theme-slot{
+  display:flex;
+  align-items:center;
+}
+.theme-toggle{
+  padding:.25rem .5rem;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.12);
+}
+html[data-theme="night"] .theme-toggle{
+  border:1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.70);
+}
+.theme-toggle .theme-label{
+  font-size:.8rem;
+  opacity:.75;
+  user-select:none;
+}
+.theme-toggle .theme-label.active{
+  opacity:1;
+  font-weight:700;
+}
+
+/* Mobile layout: brand left, toggle right, actions wrap below */
+@media (max-width: 576px){
+  .nav-theme-slot{ margin-left:auto; }
+  #navActions{ width:100%; justify-content:flex-end; flex-wrap:wrap !important; }
+  .theme-toggle{ width:auto; }
+}
+
+
+
+/* ===== Theme fixes (Jour/Nuit) ===== */
+.theme-toggle{ user-select:none; }
+.theme-side{
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.92);
+  border-radius: 999px;
+  padding: .25rem .55rem;
+  display:flex; align-items:center; gap:.35rem;
+  line-height:1;
+}
+.theme-side .theme-ico{ font-size: 14px; }
+.theme-side .theme-txt{ font-size: 12px; font-weight: 700; letter-spacing:.2px; }
+.theme-side.is-active{
+  border-color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.12);
+}
+.theme-side:active{ transform: translateY(1px); }
+
+/* Make toggle readable in NIGHT (light) */
+html[data-theme="night"] .theme-side{
+  border-color: rgba(0,0,0,.14);
+  background: rgba(0,0,0,.04);
+  color: #0b1220;
+}
+html[data-theme="night"] .theme-side.is-active{
+  background: rgba(0,0,0,.08);
+  border-color: rgba(0,0,0,.18);
+}
+
+/* Ensure any Bootstrap text-white becomes readable in NIGHT */
+html[data-theme="night"] .text-white{ color:#0b1220 !important; }
+html[data-theme="night"] .text-muted{ color: rgba(0,0,0,.62) !important; }
+
+/* Reports filters/selects: override forced dark styles when NIGHT is active */
+html[data-theme="night"] #filterAction,
+html[data-theme="night"] #filterResult{
+  background-color: rgba(255,255,255,.92) !important;
+  color:#0b1220 !important;
+  border-color: rgba(0,0,0,.12) !important;
+}
+html[data-theme="night"] #filterAction option,
+html[data-theme="night"] #filterResult option{
+  background-color: #ffffff !important;
+  color:#0b1220 !important;
+}
+
+/* Generic selects/options in NIGHT */
+html[data-theme="night"] select,
+html[data-theme="night"] .form-select{
+  background-color: rgba(255,255,255,.92);
+  color:#0b1220;
+  border-color: rgba(0,0,0,.12);
+}
+html[data-theme="night"] select option{
+  background-color: #ffffff;
+  color:#0b1220;
+}
+
+/* --- NIGHT: fix remaining forced-white texts (user name, KPI split, etc.) --- */
+html[data-theme="night"] #userPill .user-name{
+  color:#0b1220 !important;
+}
+
+html[data-theme="night"] .kpi-split,
+html[data-theme="night"] .kpi-split *{
+  color: rgba(11,18,32,.92) !important;
+}
+
+/* --- NIGHT: tables (including popups) should not stay dark --- */
+html[data-theme="night"] .table-dark{
+  --bs-table-bg: #ffffff;
+  --bs-table-color: #0b1220;
+  --bs-table-striped-bg: rgba(0,0,0,.03);
+  --bs-table-striped-color: #0b1220;
+  --bs-table-hover-bg: rgba(0,0,0,.05);
+  --bs-table-hover-color: #0b1220;
+  border-color: rgba(0,0,0,.12) !important;
+  background-color: #ffffff !important;
+  color:#0b1220 !important;
+}
+html[data-theme="night"] .table-dark th,
+html[data-theme="night"] .table-dark td{
+  color:#0b1220 !important;
+  border-color: rgba(0,0,0,.12) !important;
+}
+
+/* --- NIGHT: override earlier !important dark options on selects --- */
+html[data-theme="night"] .form-select.bg-dark option,
+html[data-theme="night"] select.bg-dark option{
+  background-color: #ffffff !important;
+  color:#0b1220 !important;
+}
+
+/* --- NIGHT: keep check/radio readable (avoid white-on-white) --- */
+html[data-theme="night"] .form-check-input{
+  border-color: rgba(11,18,32,.55) !important;
+  background-color: rgba(11,18,32,.06) !important;
+}
+html[data-theme="night"] input[type="checkbox"],
+html[data-theme="night"] input[type="radio"]{
+  accent-color: #0b1220;
+}
+
+/* Bootstrap utility texts that stay too bright in NIGHT */
+html[data-theme="night"] .text-white-50{ color: rgba(0,0,0,.55) !important; }
+html[data-theme="night"] .text-light{ color:#0b1220 !important; }
+
+/* Bootstrap modal/dropdown that remain dark in NIGHT */
+html[data-theme="night"] .modal-content.bg-dark{
+  background: rgba(255,255,255,.97) !important;
+  color:#0b1220 !important;
+  border-color: rgba(0,0
+
+/* NIGHT (light): custom OLM modals (add/edit volunteers) controls */
+html[data-theme="night"] .olm-modal input,
+html[data-theme="night"] .olm-modal textarea,
+html[data-theme="night"] .olm-modal select,
+html[data-theme="night"] .olm-modal .form-control,
+html[data-theme="night"] .olm-modal .form-select{
+  background: rgba(255,255,255,.96) !important;
+  color:#0b1220 !important;
+  border-color: rgba(0,0,0,.12) !important;
+}
+html[data-theme="night"] .olm-modal input::placeholder,
+html[data-theme="night"] .olm-modal textarea::placeholder{
+  color: rgba(0,0,0,.55) !important;
+}
+html[data-theme="night"] .olm-modal label{ color:#0b1220 !important; }
+
+/* NIGHT (light): modal form controls must be light (avoid remaining dark inputs in add/edit popups) */
+html[data-theme="night"] .modal input,
+html[data-theme="night"] .modal textarea,
+html[data-theme="night"] .modal select,
+html[data-theme="night"] .modal .form-control,
+html[data-theme="night"] .modal .form-select{
+  background: rgba(255,255,255,.96) !important;
+  color:#0b1220 !important;
+  border-color: rgba(0,0,0,.18) !important;
+}
+
+html[data-theme="night"] .modal input::placeholder,
+html[data-theme="night"] .modal textarea::placeholder{
+  color: rgba(11,18,32,.55) !important;
+}
+
+html[data-theme="night"] .modal .form-control:focus,
+html[data-theme="night"] .modal .form-select:focus{
+  border-color: rgba(0,0,0,.28) !important;
+  box-shadow: 0 0 0 .2rem rgba(0,0,0,.10) !important;
+}
+
+html[data-theme="night"] .modal .input-group-text{
+  background: rgba(0,0,0,.04) !important;
+  color:#0b1220 !important;
+  border-color: rgba(0,0,0,.18) !important;
+}
+,0,.12) !important;
+}
+html[data-theme="night"] .modal-header,
+html[data-theme="night"] .modal-footer{
+  border-color: rgba(0,0,0,.10) !important;
+}
+html[data-theme="night"] .dropdown-menu{
+  background: rgba(255,255,255,.98) !important;
+  border-color: rgba(0,0,0,.12) !important;
+}
+html[data-theme="night"] .dropdown-item{ color:#0b1220 !important; }
+html[data-theme="night"] .dropdown-item:hover,
+html[data-theme="night"] .dropdown-item:focus{ background: rgba(0,0,0,.06) !important; }
+
+/* Fix remaining white text on badge/pills when NIGHT */
+html[data-theme="night"] .user-pill{ color:#0b1220 !important; }
+html[data-theme="night"] .net-dot{ box-shadow: 0 0 0 2px rgba(0,0,0,.06); }
+
+/* Mobile: ensure theme actually applies (avoid any forced dark overrides) */
+@media (max-width: 576px){
+  html[data-theme="night"] body{ background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(200,16,46,.10), transparent 60%),
+    radial-gradient(900px 550px at 95% 0%, rgba(0,163,90,.08), transparent 55%),
+    linear-gradient(180deg, #f7f8fb, #eef1f7) !important;
+  }
+}
+
+
+
+/* ==============================
+   Nuit (thème clair) — Fix inputs in popups/modals
+   ============================== */
+html[data-theme="night"] .modal input.form-control,
+html[data-theme="night"] .modal textarea.form-control,
+html[data-theme="night"] .modal select.form-select,
+html[data-theme="night"] .modal .form-control,
+html[data-theme="night"] .modal .form-select,
+html[data-theme="night"] .olm-modal input,
+html[data-theme="night"] .olm-modal textarea,
+html[data-theme="night"] .olm-modal select,
+html[data-theme="night"] .olm-modal .form-control,
+html[data-theme="night"] .olm-modal .form-select{
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  border: 1px solid rgba(0,0,0,.18) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="night"] .modal input.form-control::placeholder,
+html[data-theme="night"] .modal textarea.form-control::placeholder,
+html[data-theme="night"] .olm-modal input::placeholder,
+html[data-theme="night"] .olm-modal textarea::placeholder{
+  color: rgba(17,17,17,.55) !important;
+}
+
+/* If some inputs keep forcing dark classes */
+html[data-theme="night"] .modal .bg-black,
+html[data-theme="night"] .olm-modal .bg-black{
+  background-color: #ffffff !important;
+}
+html[data-theme="night"] .modal input.text-white,
+html[data-theme="night"] .modal textarea.text-white,
+html[data-theme="night"] .modal select.text-white,
+html[data-theme="night"] .olm-modal input.text-white,
+html[data-theme="night"] .olm-modal textarea.text-white,
+html[data-theme="night"] .olm-modal select.text-white{
+  color: #111111 !important;
+}
+
+/* Native selects/options (best-effort; some mobile browsers ignore option styling) */
+html[data-theme="night"] select,
+html[data-theme="night"] option,
+html[data-theme="night"] optgroup{
+  background-color: #ffffff !important;
+  color: #111111 !important;
+}
