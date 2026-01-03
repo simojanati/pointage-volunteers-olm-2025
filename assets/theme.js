@@ -1,12 +1,13 @@
 /* OLM Pointage — Theme switch (Jour/Nuit)
-   Jour = thème sombre (design actuel)
-   Nuit = thème clair (lisible)
+   Jour = thème clair (lisible)
+   Nuit = thème sombre (design actuel)
    Auto (si aucun choix): Casablanca (GMT+1)
-   - Nuit (clair): 18:32 → 08:30
-   - Jour (sombre): 08:33 → 18:31
+   - Nuit (sombre): 18:32 → 08:30
+   - Jour (clair): 08:33 → 18:31
 */
 (function () {
   var STORAGE_KEY = 'olm_theme'; // 'day' | 'night'
+  var STORAGE_VER = 'olm_theme_schema'; // migration marker
   var TZ_LABEL = 'Africa/Casablanca (GMT+1)';
 
   function safeGet(key) {
@@ -23,6 +24,19 @@
     var v = safeGet(STORAGE_KEY);
     return (v === 'day' || v === 'night') ? v : null;
   }
+
+function migrateStoredTheme() {
+  // If a previous version stored theme meaning was inverted, migrate once.
+  // Old: day=dark, night=light  -> New: day=light, night=dark
+  try {
+    var v = safeGet(STORAGE_VER);
+    if (v === '2') return;
+    var t = safeGet(STORAGE_KEY);
+    if (t === 'day') safeSet(STORAGE_KEY, 'night');
+    else if (t === 'night') safeSet(STORAGE_KEY, 'day');
+    safeSet(STORAGE_VER, '2');
+  } catch (e) {}
+}
 
   // Casablanca clock: prefer Intl if available; otherwise compute from UTC (+1)
   function getCasablancaClock() {
@@ -84,6 +98,8 @@
     return (t >= DAY_START && t <= DAY_END) ? 'day' : 'night';
   }
 
+    migrateStoredTheme();
+
   function getInitialTheme() {
     return getStoredTheme() || detectAutoTheme();
   }
@@ -132,14 +148,14 @@
     wrap.className = 'theme-toggle d-flex align-items-center gap-2';
 
     wrap.innerHTML =
-      '<button type="button" class="theme-side theme-side-left" id="themeDayBtn" aria-label="Jour (thème sombre)">' +
+      '<button type="button" class="theme-side theme-side-left" id="themeDayBtn" aria-label="Jour (thème clair)">' +
         '<span class="theme-ico" aria-hidden="true">☀️</span>' +
         '<span class="theme-txt">Jour</span>' +
       '</button>' +
       '<div class="form-check form-switch m-0">' +
         '<input class="form-check-input" type="checkbox" role="switch" id="themeToggle" aria-label="Basculer le thème (jour/nuit)">' +
       '</div>' +
-      '<button type="button" class="theme-side theme-side-right" id="themeNightBtn" aria-label="Nuit (thème clair)">' +
+      '<button type="button" class="theme-side theme-side-right" id="themeNightBtn" aria-label="Nuit (thème sombre)">' +
         '<span class="theme-ico" aria-hidden="true">🌙</span>' +
         '<span class="theme-txt">Nuit</span>' +
       '</button>';
