@@ -622,6 +622,8 @@ async function ensureFullReportRows_(from, to, group){
 showLoader("Chargement du rapport...");
 
   try{
+    try{ await ensureProgrammeRange_(from, to); }catch(e){}
+
     // Fast path: single call (summary + lite rows)
     let summaryRes = null;
     let punchesRes = null;
@@ -1476,18 +1478,76 @@ function parseIso(ts){
 }
 
 
-// --- Planning groupes (alternance) ---
-// Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
+// --- Planning groupes ---
+// Nouveau: planning dynamique via Sheet "Programme" (date -> groupe A/B)
+// Fallback: alternance quotidienne basée sur une date de référence.
 const PLANNING_BASE_DATE = "2025-12-27";
 const PLANNING_BASE_GROUP = "B";
 
-function plannedGroupForDate(dateISO){
+const PROGRAMME_CACHE_KEY = "olm_programme_cache_v1";
+let __programmeMap = {};
+let __programmeLoadedAt = 0;
+
+function __loadProgrammeCache(){
+  try{
+    const raw = localStorage.getItem(PROGRAMME_CACHE_KEY);
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    if(obj && typeof obj === "object"){
+      __programmeMap = obj.map || {};
+      __programmeLoadedAt = Number(obj.loadedAt || 0) || 0;
+    }
+  }catch(e){}
+}
+function __saveProgrammeCache(){
+  try{
+    localStorage.setItem(PROGRAMME_CACHE_KEY, JSON.stringify({ map: __programmeMap, loadedAt: __programmeLoadedAt }));
+  }catch(e){}
+}
+function __normGroupVal(g){
+  const x = String(g||"").trim().toUpperCase();
+  return (x === "A" || x === "B") ? x : "";
+}
+function __programmeGroup(dateISO){
+  const d = String(dateISO||"").trim();
+  if(!d) return "";
+  const g = __programmeMap && __programmeMap[d];
+  return __normGroupVal(g);
+}
+function plannedGroupAltForDate(dateISO){
   if(!dateISO) return PLANNING_BASE_GROUP;
   const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
   const d1 = new Date(String(dateISO) + "T00:00:00");
   const diffDays = Math.floor((d1.getTime() - d0.getTime()) / 86400000);
   if(diffDays % 2 === 0) return PLANNING_BASE_GROUP;
   return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
+}
+async function ensureProgrammeRange_(fromISO, toISO){
+  if(!__programmeLoadedAt) __loadProgrammeCache();
+
+  const from = String(fromISO||"").trim();
+  const to = String(toISO||fromISO||"").trim();
+  if(!from) return;
+
+  const now = Date.now();
+  if(__programmeLoadedAt && (now - __programmeLoadedAt) < 5*60*1000 && __programmeGroup(from)) return;
+
+  try{
+    if(typeof apiProgrammeRange !== "function") return;
+    const res = await apiProgrammeRange(from, to);
+    if(res && res.ok){
+      const map = res.map || {};
+      __programmeMap = { ...( __programmeMap || {} ), ...map };
+      __programmeLoadedAt = now;
+      __saveProgrammeCache();
+    }
+  }catch(e){}
+}
+
+function plannedGroupForDate(dateISO){
+  const g = __programmeGroup(dateISO);
+  if(g) return g;
+  return plannedGroupAltForDate(dateISO);
 }
 function offGroupForDate(dateISO){
   const g = plannedGroupForDate(dateISO);

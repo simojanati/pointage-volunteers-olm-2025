@@ -12,6 +12,7 @@ const SHEET_VOL_ARCHIVE = "ArchiveVolunteers";
 const SHEET_PUNCH = "Punches";
 const SHEET_USERS = "Users";
 const SHEET_LOGS = "Logs";
+const SHEET_PROGRAMME = "Programme";
 
 const ROLE_ORDER = { "ADMIN": 1, "SUPER_ADMIN": 2 };
 
@@ -58,6 +59,81 @@ function ensureHeader(sheet, name){
   if(header.indexOf(key) === -1){
     sheet.getRange(1, lastCol+1).setValue(name);
   }
+}
+
+
+
+/** ---------------- Programme (Planning groupes par jour) ----------------
+ * Sheet: Programme
+ * Colonnes recommandées: date | group | note
+ * - date: YYYY-MM-DD
+ * - group: A ou B
+ */
+function ensureProgrammeSheet_(){
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(SHEET_PROGRAMME);
+  if(!sh){
+    sh = ss.insertSheet(SHEET_PROGRAMME);
+    sh.getRange(1,1,1,3).setValues([["date","group","note"]]);
+  }else{
+    ensureHeader(sh, "date");
+    ensureHeader(sh, "group");
+    ensureHeader(sh, "note");
+  }
+  return sh;
+}
+
+function normGroup_(g){
+  const x = String(g||"").trim().toUpperCase();
+  if(x === "A" || x === "B") return x;
+  return "";
+}
+
+function programmeRange(p){
+  const from = String(p.from || p.date || "").trim();
+  const to = String(p.to || p.date || "").trim();
+
+  const sh = ensureProgrammeSheet_();
+  const h = headerIndex(sh);
+  if(!h.ok) return h;
+
+  const idx = h.idx || {};
+  const di = (idx["date"] !== undefined) ? idx["date"]
+    : (idx["jour"] !== undefined ? idx["jour"]
+    : (idx["day"] !== undefined ? idx["day"] : undefined));
+  const gi = (idx["group"] !== undefined) ? idx["group"]
+    : (idx["groupe"] !== undefined ? idx["groupe"] : undefined);
+  const ni = (idx["note"] !== undefined) ? idx["note"] : undefined;
+
+  if(di === undefined || gi === undefined) return { ok:false, error:"PROGRAMME_BAD_HEADER" };
+
+  const f = from || "";
+  const t = to || from || "";
+
+  const rows = h.values.slice(1);
+  const map = {};
+  const out = [];
+
+  rows.forEach(r => {
+    const d = toYMD(r[di]);
+    if(!d) return;
+    if(f && d < f) return;
+    if(t && d > t) return;
+    const g = normGroup_(r[gi]);
+    if(!g) return;
+    map[d] = g; // last wins
+    out.push({ date:d, group:g, note: (ni !== undefined) ? String(r[ni]||"").trim() : "" });
+  });
+
+  return { ok:true, from:f, to:t, map: map, rows: out };
+}
+
+function programmeGet(p){
+  const date = String(p.date || "").trim();
+  if(!date) return { ok:false, error:"MISSING_DATE" };
+  const res = programmeRange({ from: date, to: date });
+  if(!res.ok) return res;
+  return { ok:true, date: date, group: (res.map && res.map[date]) ? res.map[date] : "" };
 }
 
 function pickGroup(idx, row){
@@ -365,7 +441,20 @@ if(action === "dashboardStats"){
       return jsonp(volunteerHistory(p), callback);
     }
 
-    return jsonp({ ok:false, error:"UNKNOWN_ACTION" }, callback);
+if(action === "programmeRange"){
+  const auth = requireRole(p, "ADMIN");
+  if(!auth.ok) return jsonp(auth, callback);
+  p.__session = auth.session;
+  return jsonp(programmeRange(p), callback);
+}
+if(action === "programmeGet"){
+  const auth = requireRole(p, "ADMIN");
+  if(!auth.ok) return jsonp(auth, callback);
+  p.__session = auth.session;
+  return jsonp(programmeGet(p), callback);
+}
+
+return jsonp({ ok:false, error:"UNKNOWN_ACTION" }, callback);
   }catch(err){
     return jsonp({ ok:false, error:"SERVER_ERROR", detail:String(err) }, callback);
   }

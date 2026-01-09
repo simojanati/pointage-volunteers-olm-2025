@@ -60,11 +60,43 @@ function isSuper() { return (localStorage.getItem('role') || '') === 'SUPER_ADMI
 function isAdminOrSuper() { const r = (localStorage.getItem('role') || ''); return r === 'SUPER_ADMIN' || r === 'ADMIN'; }
 
 
-// --- Planning groupes (alternance) ---
-// Référence: 2025-12-27 => Groupe B actif, Groupe A OFF. Ensuite alternance quotidienne.
+// --- Planning groupes ---
+// Nouveau: planning dynamique via Sheet "Programme" (date -> groupe A/B)
+// Fallback: alternance quotidienne basée sur une date de référence.
 const PLANNING_BASE_DATE = "2025-12-27";
 const PLANNING_BASE_GROUP = "B";
-function plannedGroupForDate(dateISO) {
+
+const PROGRAMME_CACHE_KEY = "olm_programme_cache_v1";
+let __programmeMap = {};
+let __programmeLoadedAt = 0;
+
+function __loadProgrammeCache(){
+  try{
+    const raw = localStorage.getItem(PROGRAMME_CACHE_KEY);
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    if(obj && typeof obj === "object"){
+      __programmeMap = obj.map || {};
+      __programmeLoadedAt = Number(obj.loadedAt || 0) || 0;
+    }
+  }catch(e){}
+}
+function __saveProgrammeCache(){
+  try{
+    localStorage.setItem(PROGRAMME_CACHE_KEY, JSON.stringify({ map: __programmeMap, loadedAt: __programmeLoadedAt }));
+  }catch(e){}
+}
+function __normGroupVal(g){
+  const x = String(g||"").trim().toUpperCase();
+  return (x === "A" || x === "B") ? x : "";
+}
+function __programmeGroup(dateISO){
+  const d = String(dateISO||"").trim();
+  if(!d) return "";
+  const g = __programmeMap && __programmeMap[d];
+  return __normGroupVal(g);
+}
+function plannedGroupAltForDate(dateISO){
   if (!dateISO) return PLANNING_BASE_GROUP;
   const d0 = new Date(PLANNING_BASE_DATE + "T00:00:00");
   const d1 = new Date(String(dateISO) + "T00:00:00");
@@ -72,6 +104,37 @@ function plannedGroupForDate(dateISO) {
   if (diffDays % 2 === 0) return PLANNING_BASE_GROUP;
   return (PLANNING_BASE_GROUP === "A") ? "B" : "A";
 }
+async function ensureProgrammeRange_(fromISO, toISO){
+  // Best-effort: load cache first
+  if(!__programmeLoadedAt) __loadProgrammeCache();
+
+  const from = String(fromISO||"").trim();
+  const to = String(toISO||fromISO||"").trim();
+  if(!from) return;
+
+  // Avoid spamming API: refresh at most every 5 min
+  const now = Date.now();
+  if(__programmeLoadedAt && (now - __programmeLoadedAt) < 5*60*1000 && __programmeGroup(from)) return;
+
+  try{
+    if(typeof apiProgrammeRange !== "function") return;
+    const res = await apiProgrammeRange(from, to);
+    if(res && res.ok){
+      const map = res.map || {};
+      __programmeMap = { ...( __programmeMap || {} ), ...map };
+      __programmeLoadedAt = now;
+      __saveProgrammeCache();
+    }
+  }catch(e){
+    // keep cache/fallback
+  }
+}
+function plannedGroupForDate(dateISO) {
+  const g = __programmeGroup(dateISO);
+  if(g) return g;
+  return plannedGroupAltForDate(dateISO);
+}
+
 
 
 function renderUserPill() {
@@ -601,7 +664,13 @@ async function load(forceReloadVolunteers = false, showOverlay = false) {
   try {
     // Always refresh today's punches (light)
     todayISO = await refreshTodayPunches();
-    todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    try{ await ensureProgrammeRange_(todayISO, todayISO); }catch(e){}
+    try{
+      const g = plannedGroupForDate(todayISO);
+      todayEl.textContent = g ? `Aujourd'hui : ${todayISO} — Groupe actif : ${g}` : `Aujourd'hui : ${todayISO}`;
+    }catch(e){
+      todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    }
 
     // Fast cache render (optional) to reduce first-load perceived latency
     if (isFirst) {
@@ -647,11 +716,10 @@ function bindUI() {
     const openAddBtn = document.getElementById("openAddBtn");
     if (openAddBtn) openAddBtn.classList.toggle("d-none", !isSuper());
   } catch (e) { }
-
-  // restore group filter
+  // group filter: default always = Tous les groupes
   try {
-    const g = localStorage.getItem("pointage_group_filter") || "";
-    if (groupFilterEl) groupFilterEl.value = g;
+    if (groupFilterEl) groupFilterEl.value = "";
+    localStorage.removeItem("pointage_group_filter");
   } catch (e) { }
 }
 
@@ -775,7 +843,13 @@ groupPunchDoBtn?.addEventListener('click', async () => {
 
     // Refresh list status
     todayISO = await refreshTodayPunches();
-    todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    try{ await ensureProgrammeRange_(todayISO, todayISO); }catch(e){}
+    try{
+      const g = plannedGroupForDate(todayISO);
+      todayEl.textContent = g ? `Aujourd'hui : ${todayISO} — Groupe actif : ${g}` : `Aujourd'hui : ${todayISO}`;
+    }catch(e){
+      todayEl.textContent = `Aujourd'hui : ${todayISO}`;
+    }
     renderFromCache();
   } catch (e) {
     console.error(e);
@@ -922,7 +996,7 @@ searchEl?.addEventListener("input", () => {
   }, 120);
 });
 groupFilterEl?.addEventListener("change", () => {
-  try { localStorage.setItem("pointage_group_filter", groupFilterEl.value || ""); } catch (e) { }
+  // no persistence: always default to "Tous les groupes" on reload
   renderFromCache();
 });
 logoutBtn?.addEventListener("click", logout);
@@ -1134,25 +1208,20 @@ function applyRoleUI() {
   adminOnly.forEach(el => { el.style.display = isAdminOrSuper() ? '' : 'none'; });
 }
 
+
 function applyPlanningUI() {
   try {
-    const todayISO = (typeof isoDate === "function") ? isoDate(new Date()) : new Date().toISOString().slice(0, 10);
-    const workG = plannedGroupForDate(todayISO);
-
-    // default group filter = groupe actif du jour (si pas déjà choisi)
-    if (groupFilterEl && !groupFilterEl.value) {
-      groupFilterEl.value = workG;
-    }
-
-    // title
+    // keep UI stable: filter default = Tous les groupes (value = "")
+    // just keep a clean title
     const titleEl = document.getElementById("pageTitle");
     if (titleEl) {
-      titleEl.textContent = `Volontaires Groupe ${workG} : 15h - 19h`;
+      titleEl.textContent = `Volontaires : 15h - 19h`;
     }
   } catch (e) {
     console.warn("applyPlanningUI", e);
   }
 }
+
 
 
 

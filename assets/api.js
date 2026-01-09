@@ -160,3 +160,11 @@ async function apiRunAutoPunchRoles(dryRun=false, date=""){
   if(date) payload.date = String(date);
   return jsonpRequest(payload);
 }
+
+// Programme (planning groupes par jour)
+async function apiProgrammeRange(fromISO, toISO){
+  return jsonpRequest({ action:"programmeRange", from: String(fromISO||""), to: String(toISO||"") });
+}
+async function apiProgrammeGet(dateISO){
+  return jsonpRequest({ action:"programmeGet", date: String(dateISO||"") });
+}

@@ -112,6 +112,7 @@ Le projet est conçu pour un usage **mobile-first** (scanner caméra) tout en re
 - Un Google Sheet avec les feuilles :
   - `Volunteers` (bénévoles)
   - `Punches` (pointages)
+  - `Programme` (planning groupes par jour) **(créée automatiquement si absente)**
   - `Logs` (créée automatiquement si absente)
 - Google Apps Script déployé en **Web App**.
 - Front hébergé (GitHub Pages, Cloudflare Pages, Netlify…) en HTTPS pour l’accès caméra.
@@ -135,6 +136,18 @@ Colonnes typiques (les noms sont gérés par le script via header) :
 - `full_name`
 - `badge_code`
 - `group`
+
+
+
+### Programme (planning groupes)
+Feuille utilisée pour définir **quel groupe travaille quel jour** (planning manuel).
+
+Colonnes recommandées :
+- `date` : `YYYY-MM-DD`
+- `group` : `A` ou `B`
+- `note` : (optionnel)
+
+> Si un jour n’existe pas dans `Programme`, l’application retombe sur le mode **alternance automatique** (fallback).
 
 ### Logs
 Créée automatiquement par le script, avec notamment :
